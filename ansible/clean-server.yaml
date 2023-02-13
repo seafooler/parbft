@@ -1,0 +1,9 @@
+- hosts: parbft
+  remote_user: vagrant
+  gather_facts: no
+  tasks:
+    - name: kill parbft
+      shell: sudo killall parbft
+      ignore_errors: yes
+    - name: clean the testbed directory
+      shell: rm -rf /home/vagrant/parbft-testbed

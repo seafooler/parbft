@@ -1,0 +1,12 @@
+- hosts: parbft
+  remote_user: vagrant
+  gather_facts: no
+  tasks:
+    - name: synchronize parbft executable file
+      synchronize:
+        src: /vagrant/parbft
+        dest: /home/vagrant
+    - name: copy configuration file
+      copy:
+        src: /vagrant/parbft/config_gen/{{inventory_hostname}}.yaml
+        dest: /home/vagrant/parbft/config.yaml

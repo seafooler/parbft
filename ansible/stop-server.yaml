@@ -1,0 +1,7 @@
+- hosts: parbft
+  remote_user: vagrant
+  gather_facts: no
+  tasks:
+    - name: kill parbft
+      shell: sudo killall parbft
+      ignore_errors: yes

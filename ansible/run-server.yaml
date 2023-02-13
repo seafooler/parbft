@@ -1,0 +1,12 @@
+- hosts: parbft
+  remote_user: vagrant
+  gather_facts: no
+  tasks:
+    - name: create testbed dirs
+      file:
+        path: /home/vagrant/parbft-testbed
+        state: directory
+    - name: run parbft as a daemon
+      shell: "(nohup ./parbft > /home/vagrant/parbft-testbed/log0.txt 2>&1 &)"
+      args:
+        chdir: /home/vagrant/parbft
