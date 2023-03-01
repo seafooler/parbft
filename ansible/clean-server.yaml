@@ -6,4 +6,4 @@
       shell: sudo killall parbft
       ignore_errors: yes
     - name: clean the testbed directory
-      shell: rm -rf /home/vagrant/parbft-testbed
+      shell: rm -rf /home/vagrant/{{inventory_hostname}}/parbft-testbed

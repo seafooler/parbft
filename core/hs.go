@@ -10,8 +10,8 @@ type HS struct {
 	node *Node
 
 	hLogger    hclog.Logger
-	leaderId   int
-	proofReady chan *ProofData
+	LeaderId   int
+	ProofReady chan *ProofData
 
 	cachedVoteMsgs       map[int]map[int][]byte
 	cachedBlockProposals map[int]*HSProposalMsg
@@ -28,9 +28,9 @@ func NewHS(n *Node, leader int) *HS {
 			Output: hclog.DefaultOutput,
 			Level:  hclog.Level(n.Config.LogLevel),
 		}),
-		leaderId: leader,
+		LeaderId: leader,
 
-		proofReady:           make(chan *ProofData),
+		ProofReady:           make(chan *ProofData),
 		cachedVoteMsgs:       make(map[int]map[int][]byte),
 		cachedBlockProposals: make(map[int]*HSProposalMsg),
 		cachedHeight:         make(map[int]bool),
@@ -39,7 +39,10 @@ func NewHS(n *Node, leader int) *HS {
 
 // BroadcastProposalProof broadcasts the new block and proof of previous block through the ProposalMsg
 func (h *HS) BroadcastProposalProof(blk *Block) error {
-	pr := <-h.proofReady
+	if h.LeaderId != h.node.Id {
+		return nil
+	}
+	pr := <-h.ProofReady
 	if pr.Height != blk.Height-1 {
 		h.hLogger.Error("Height of proof is incorrect", "pr.Height", pr.Height, "blk.Height", blk.Height)
 	}
@@ -50,6 +53,8 @@ func (h *HS) BroadcastProposalProof(blk *Block) error {
 	if err := h.node.PlainBroadcast(HSProposalMsgTag, proposalMsg, nil); err != nil {
 		return err
 	}
+	h.hLogger.Info("successfully broadcast a new proposal and proof",
+		"height", blk.Height)
 	return nil
 }
 
@@ -61,23 +66,20 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	h.cachedHeight[pm.Height] = true
 	h.cachedBlockProposals[pm.Height] = pm
 	// do not retrieve the previous block nor verify the proof for the 0th block
-	if pm.Height%50 != 0 {
-		// try to cache a previous block
-		h.tryCache(pm.Height, pm.Proof)
+	// try to cache a previous block
+	h.tryCache(pm.Height, pm.Proof)
 
-		// if there is already a subsequent block, deal with it
-		if _, ok := h.cachedHeight[pm.Height+1]; ok {
-			h.tryCache(pm.Height+1, h.cachedBlockProposals[pm.Height+1].Proof)
-		}
-
-		go func() {
-			h.node.readyData <- ReadyData{
-				ComponentId: 0,
-				Height:      pm.Height,
-			}
-		}()
-
+	// if there is already a subsequent block, deal with it
+	if _, ok := h.cachedHeight[pm.Height+1]; ok {
+		h.tryCache(pm.Height+1, h.cachedBlockProposals[pm.Height+1].Proof)
 	}
+
+	go func() {
+		h.node.readyData <- ReadyData{
+			ComponentId: 0,
+			Height:      pm.Height,
+		}
+	}()
 
 	// send the ts share of new block
 	if err := h.sendVote(pm); err != nil {
@@ -136,7 +138,7 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 		Height: pm.Height,
 		Voter:  h.node.Id,
 	}
-	leaderAddrPort := h.node.Id2AddrMap[h.leaderId] + ":" + h.node.Id2PortMap[h.leaderId]
+	leaderAddrPort := h.node.Id2AddrMap[h.LeaderId] + ":" + h.node.Id2PortMap[h.LeaderId]
 	err = h.node.SendMsg(HSVoteMsgTag, hsVoteMsg, nil, leaderAddrPort)
 	if err != nil {
 		h.hLogger.Error("fail to vote for the block", "block_index", pm.Height)
@@ -186,7 +188,7 @@ func (h *HS) tryAssembleProof(height int) error {
 		proof := sign_tools.AssembleIntactTSPartial(shares, h.node.PubKeyTS, blockBytes, h.node.N-h.node.F, h.node.N)
 
 		go func() {
-			h.proofReady <- &ProofData{
+			h.ProofReady <- &ProofData{
 				Proof:  proof,
 				Height: height,
 			}

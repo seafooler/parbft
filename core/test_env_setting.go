@@ -49,8 +49,8 @@ func Setup(numNode int, startPort int, logLevel int) []*Node {
 	for _, node := range nodes {
 		go node.HandleMsgsLoop()
 		go func(n *Node) {
-			if n.Id == n.Hs.leaderId {
-				n.Hs.proofReady <- &ProofData{
+			if n.Id == n.Hs.LeaderId {
+				n.Hs.ProofReady <- &ProofData{
 					Proof:  nil,
 					Height: 0,
 				}

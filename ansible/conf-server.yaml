@@ -5,8 +5,8 @@
     - name: synchronize parbft executable file
       synchronize:
         src: /vagrant/parbft
-        dest: /home/vagrant
+        dest: /home/vagrant/{{inventory_hostname}}
     - name: copy configuration file
       copy:
         src: /vagrant/parbft/config_gen/{{inventory_hostname}}.yaml
-        dest: /home/vagrant/parbft/config.yaml
+        dest: /home/vagrant/{{inventory_hostname}}/parbft/config.yaml

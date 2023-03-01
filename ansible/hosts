@@ -1,5 +1,5 @@
 [parbft]
 node0 ansible_host=192.168.5.10
-node1 ansible_host=192.168.5.11
-node2 ansible_host=192.168.5.12
-node3 ansible_host=192.168.5.13
+node1 ansible_host=192.168.5.10
+node2 ansible_host=192.168.5.10
+node3 ansible_host=192.168.5.10

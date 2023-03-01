@@ -153,37 +153,45 @@ func (n *Node) HandleMsgsLoop() {
 
 			// continue the optimistic path
 			if newBlock.Height == n.startedHSHeight+1 {
-				go func(blk *Block) {
-					if err := n.Hs.BroadcastProposalProof(blk); err != nil {
-						n.logger.Error("fail to broadcast proposal and proof", "height", blk.Height,
-							"err", err.Error())
-					} else {
-						n.logger.Debug("successfully broadcast a new proposal and proof", "height", blk.Height)
-					}
-				}(newBlock)
+				n.LaunchOptimisticPath(newBlock)
 				n.startedHSHeight++
 			}
 
 			// launch the pessimistic path
-			if _, ok := n.smvbaMap[newBlock.Height]; !ok {
-				n.smvbaMap[newBlock.Height] = NewSMVBA(n, newBlock.Height)
-				n.abaMap[newBlock.Height] = NewABA(n, newBlock.Height)
-				n.startedSMVBAHeight = newBlock.Height
-				n.restoreMessages(newBlock.Height)
-				go func(blk *Block) {
-					// For testing: to let the pessimistic path run slower
-					time.Sleep(time.Millisecond * 500)
-
-					n.smvbaMap[blk.Height].RunOneMVBAView(false,
-						[]byte(fmt.Sprintf("%d", blk.Height)), nil, -1)
-				}(newBlock)
-			}
+			n.LaunchPessimisticPath(newBlock)
 		}
 	}
 }
 
+func (n *Node) LaunchOptimisticPath(blk *Block) {
+	go func(blk *Block) {
+		if err := n.Hs.BroadcastProposalProof(blk); err != nil {
+			n.logger.Error("fail to broadcast proposal and proof", "height", blk.Height,
+				"err", err.Error())
+		} else {
+			n.logger.Debug("successfully broadcast a new proposal and proof", "height", blk.Height)
+		}
+	}(blk)
+}
+
+func (n *Node) LaunchPessimisticPath(blk *Block) {
+	if _, ok := n.smvbaMap[blk.Height]; !ok {
+		n.smvbaMap[blk.Height] = NewSMVBA(n, blk.Height)
+		n.abaMap[blk.Height] = NewABA(n, blk.Height)
+		n.startedSMVBAHeight = blk.Height
+		n.restoreMessages(blk.Height)
+		go func(blk *Block) {
+			// For testing: to let the pessimistic path run slower
+			time.Sleep(time.Millisecond * 500)
+
+			n.smvbaMap[blk.Height].RunOneMVBAView(false,
+				[]byte(fmt.Sprintf("%d", blk.Height)), nil, -1)
+		}(blk)
+	}
+}
+
 func (n *Node) updateStatusByOptimisticData(data *ReadyData) {
-	n.logger.Debug("Update the node status", "replica", n.Name, "data", data)
+	n.logger.Info("Update the node status", "replica", n.Name, "data", data)
 	n.Lock()
 	defer n.Unlock()
 
@@ -209,15 +217,12 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData) {
 		return
 	}
 
-	// do not retrieve the previous block nor verify the proof for the 0th block
-	if data.Height%50 != 0 {
-		// try to commit a pre-previous block
-		n.tryCommit(data.Height)
+	// try to commit a pre-previous block
+	n.tryCommit(data.Height)
 
-		// if there is a subsequent-subsequent block, deal with it
-		if _, ok := n.proofedHeight[data.Height+2]; ok {
-			n.tryCommit(data.Height + 2)
-		}
+	// if there is a subsequent-subsequent block, deal with it
+	if _, ok := n.proofedHeight[data.Height+2]; ok {
+		n.tryCommit(data.Height + 2)
 	}
 }
 
