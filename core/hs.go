@@ -2,7 +2,6 @@ package core
 
 import (
 	"github.com/hashicorp/go-hclog"
-	"github.com/seafooler/sign_tools"
 	"sync"
 )
 
@@ -86,7 +85,11 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 		return err
 	}
 
-	return h.tryAssembleProof(pm.Height)
+	if h.LeaderId == h.node.Id {
+		return h.tryAssembleProof(pm.Height)
+	} else {
+		return nil
+	}
 }
 
 // tryCache must be wrapped in a lock
@@ -100,17 +103,17 @@ func (h *HS) tryCache(height int, proof []byte) error {
 		return nil
 	}
 
-	// verify the proof
-	blockBytes, err := encode(pBlk.Block)
-	if err != nil {
-		h.hLogger.Error("fail to encode the block", "block_index", height)
-		return err
-	}
-
-	if _, err := sign_tools.VerifyTS(h.node.PubKeyTS, blockBytes, proof); err != nil {
-		h.hLogger.Error("fail to verify proof of a previous block", "prev_block_index", pBlk.Height)
-		return err
-	}
+	//// verify the proof
+	//blockBytes, err := encode(pBlk.Block)
+	//if err != nil {
+	//	h.hLogger.Error("fail to encode the block", "block_index", height)
+	//	return err
+	//}
+	//
+	//if _, err := sign_tools.VerifyTS(h.node.PubKeyTS, blockBytes, proof); err != nil {
+	//	h.hLogger.Error("fail to verify proof of a previous block", "prev_block_index", pBlk.Height)
+	//	return err
+	//}
 
 	delete(h.cachedHeight, pBlk.Height)
 
@@ -125,21 +128,21 @@ func (h *HS) tryCache(height int, proof []byte) error {
 // send vote to the leader
 func (h *HS) sendVote(pm *HSProposalMsg) error {
 	// create the ts share of new block
-	blockBytes, err := encode(pm.Block)
-	if err != nil {
-		h.hLogger.Error("fail to encode the block", "block_index", pm.Height)
-		return err
-	}
-	share := sign_tools.SignTSPartial(h.node.PriKeyTS, blockBytes)
+	//blockBytes, err := encode(pm.Block)
+	//if err != nil {
+	//	h.hLogger.Error("fail to encode the block", "block_index", pm.Height)
+	//	return err
+	//}
+	//share := sign_tools.SignTSPartial(h.node.PriKeyTS, blockBytes)
 
 	// send the ts share to the leader
 	hsVoteMsg := HSVoteMsg{
-		Share:  share,
+		Share:  nil,
 		Height: pm.Height,
 		Voter:  h.node.Id,
 	}
 	leaderAddrPort := h.node.Id2AddrMap[h.LeaderId] + ":" + h.node.Id2PortMap[h.LeaderId]
-	err = h.node.SendMsg(HSVoteMsgTag, hsVoteMsg, nil, leaderAddrPort)
+	err := h.node.SendMsg(HSVoteMsgTag, hsVoteMsg, nil, leaderAddrPort)
 	if err != nil {
 		h.hLogger.Error("fail to vote for the block", "block_index", pm.Height)
 		return err
@@ -172,24 +175,24 @@ func (h *HS) tryAssembleProof(height int) error {
 			i++
 		}
 
-		cBlk, ok := h.cachedBlockProposals[height]
-		if !ok {
-			h.hLogger.Debug("cachedBlocks does not contain the block", "h.cachedBlocks", h.cachedBlockProposals,
-				"vm.Height", height)
-			// This is not an error, since HsProposalMsg may be delivered later
-			return nil
-		}
-
-		blockBytes, err := encode(cBlk.Block)
-		if err != nil {
-			h.hLogger.Error("fail to encode the block", "block_index", height)
-			return err
-		}
-		proof := sign_tools.AssembleIntactTSPartial(shares, h.node.PubKeyTS, blockBytes, h.node.N-h.node.F, h.node.N)
+		//cBlk, ok := h.cachedBlockProposals[height]
+		//if !ok {
+		//	h.hLogger.Debug("cachedBlocks does not contain the block", "h.cachedBlocks", h.cachedBlockProposals,
+		//		"vm.Height", height)
+		//	// This is not an error, since HsProposalMsg may be delivered later
+		//	return nil
+		//}
+		//
+		//blockBytes, err := encode(cBlk.Block)
+		//if err != nil {
+		//	h.hLogger.Error("fail to encode the block", "block_index", height)
+		//	return err
+		//}
+		//proof := sign_tools.AssembleIntactTSPartial(shares, h.node.PubKeyTS, blockBytes, h.node.N-h.node.F, h.node.N)
 
 		go func() {
 			h.ProofReady <- &ProofData{
-				Proof:  proof,
+				Proof:  nil,
 				Height: height,
 			}
 		}()
