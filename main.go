@@ -29,7 +29,7 @@ func main() {
 	}
 
 	// wait for each node to start
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 20)
 
 	if err = node.EstablishP2PConns(); err != nil {
 		panic(err)

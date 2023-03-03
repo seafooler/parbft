@@ -1,0 +1,20 @@
+{
+  "key": {
+    "name": "parbft",
+    "path": "/home/vagrant"
+  },
+  "ports": {
+    "consensus": 8000,
+    "mempool": 7000,
+    "front": 6000
+  },
+  "repo": {
+    "name": "parbft",
+    "url": "https://github.com/seafooler/parbft.git",
+    "branch": "master"
+  },
+  "instances": {
+    "type": "m5d.large",
+    "regions": ["us-east-1", "eu-north-1", "ap-northeast-1", "ap-southeast-2", "us-west-1"]
+  }
+}

@@ -29,6 +29,7 @@ var msgTagNameMap = map[uint8]string{
 }
 
 type Block struct {
+	TxNum    int
 	Reqs     []byte
 	Height   int
 	Proposer int
@@ -52,31 +53,35 @@ type HSVoteMsg struct {
 
 type ReadyData struct {
 	ComponentId uint8 // 0 represents data being sent from the optimistic path, while 1 represents one from ABA
+	TxCount     int
 	Height      int
 }
 
 // ABABvalRequestMsg holds the input value of the binary input.
 type ABABvalRequestMsg struct {
-	Height int
-	Sender int
-	Round  uint32
-	BValue uint8
+	Height  int
+	Sender  int
+	TxCount int
+	Round   uint32
+	BValue  uint8
 }
 
 // ABAAuxRequestMsg holds the output value.
 type ABAAuxRequestMsg struct {
-	Height int
-	Sender int
-	Round  uint32
-	BValue uint8
-	TSPar  []byte
+	Height  int
+	TxCount int
+	Sender  int
+	Round   uint32
+	BValue  uint8
+	TSPar   []byte
 }
 
 // ABAExitMsg indicates that a replica has decided
 type ABAExitMsg struct {
-	Height int
-	Sender int
-	Value  int
+	Height  int
+	Sender  int
+	TxCount int
+	Value   int
 }
 
 type SMVBAViewPhase struct {
@@ -85,15 +90,17 @@ type SMVBAViewPhase struct {
 }
 
 type SMVBAPBVALMessage struct {
-	Height int
-	Data   []byte
-	Proof  []byte
-	Dealer string // dealer and sender are the same
+	Height  int
+	TxCount int
+	Data    []byte
+	Proof   []byte
+	Dealer  string // dealer and sender are the same
 	SMVBAViewPhase
 }
 
 type SMVBAPBVOTMessage struct {
 	Height     int
+	TxCount    int
 	Data       []byte
 	PartialSig []byte
 	Dealer     string
@@ -102,30 +109,34 @@ type SMVBAPBVOTMessage struct {
 }
 
 type SMVBAQCedData struct {
-	Height int
-	Data   []byte
-	QC     []byte
+	Height  int
+	TxCount int
+	Data    []byte
+	QC      []byte
 	SMVBAViewPhase
 }
 
 type SMVBAFinishMessage struct {
-	Height int
-	Data   []byte
-	QC     []byte
-	Dealer string
-	View   int
+	Height  int
+	Data    []byte
+	QC      []byte
+	Dealer  string
+	TxCount int
+	View    int
 }
 
 type SMVBADoneShareMessage struct {
 	Height  int
 	TSShare []byte
 	Sender  string
+	TxCount int
 	View    int
 }
 
 // SMVBAPreVoteMessage must contain SNView
 type SMVBAPreVoteMessage struct {
 	Height            int
+	TxCount           int
 	Flag              bool
 	Dealer            string
 	Value             []byte
@@ -137,12 +148,13 @@ type SMVBAPreVoteMessage struct {
 
 // SMVBAVoteMessage must contain SNView
 type SMVBAVoteMessage struct {
-	Height int
-	Flag   bool
-	Dealer string
-	Value  []byte
-	Proof  []byte // sigma_1 or sigma_{PN}
-	Pho    []byte // pho_{2,i} or pho_{vn, i}
+	Height  int
+	TxCount int
+	Flag    bool
+	Dealer  string
+	Value   []byte
+	Proof   []byte // sigma_1 or sigma_{PN}
+	Pho     []byte // pho_{2,i} or pho_{vn, i}
 
 	Sender string
 
@@ -150,15 +162,17 @@ type SMVBAVoteMessage struct {
 }
 
 type SMVBAHaltMessage struct {
-	Height int
-	Value  []byte
-	Proof  []byte
-	Dealer string
-	View   int
+	Height  int
+	TxCount int
+	Value   []byte
+	Proof   []byte
+	Dealer  string
+	View    int
 }
 
 type SMVBAReadyViewData struct {
 	Height      int
+	txCount     int
 	usePrevData bool // indicate if using the previous data
 	data        []byte
 	proof       []byte

@@ -76,6 +76,7 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	go func() {
 		h.node.readyData <- ReadyData{
 			ComponentId: 0,
+			TxCount:     pm.TxNum,
 			Height:      pm.Height,
 		}
 	}()

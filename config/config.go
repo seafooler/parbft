@@ -27,28 +27,41 @@ type Config struct {
 	Id2AddrMap map[int]string // map from id to address
 	Id2PortMap map[int]string // map from id to p2pPort
 
-	MaxPool  int
-	LogLevel int
-	Timeout  int
+	MaxPool         int
+	LogLevel        int
+	Timeout         int
+	NetworkDelay    int
+	DDoS            bool
+	MaxPayloadSize  int
+	MaxPayloadCount int
+	Rate            int
+	TxSize          int
 }
 
 // New creates a new variable of type Config from some arguments.
 func New(id int, name string, id2NameMap map[int]string, name2IdMap map[string]int, addr, p2pPort string,
-	priKeyTS *share.PriShare, pubKeyTS *share.PubPoly, id2AddrMap, id2PortMap map[int]string, maxPool, logLevel, timeOut int) *Config {
+	priKeyTS *share.PriShare, pubKeyTS *share.PubPoly, id2AddrMap, id2PortMap map[int]string, maxPool, logLevel,
+	timeOut int, networkDelay int, ddos bool, maxPayloadSize, maxPayloadCount, rate, txSize int) *Config {
 	conf := &Config{
-		Id:         id,
-		Name:       name,
-		Id2NameMap: id2NameMap,
-		Name2IdMap: name2IdMap,
-		Addr:       addr,
-		P2pPort:    p2pPort,
-		PriKeyTS:   priKeyTS,
-		PubKeyTS:   pubKeyTS,
-		Id2AddrMap: id2AddrMap,
-		Id2PortMap: id2PortMap,
-		MaxPool:    maxPool,
-		LogLevel:   logLevel,
-		Timeout:    timeOut,
+		Id:              id,
+		Name:            name,
+		Id2NameMap:      id2NameMap,
+		Name2IdMap:      name2IdMap,
+		Addr:            addr,
+		P2pPort:         p2pPort,
+		PriKeyTS:        priKeyTS,
+		PubKeyTS:        pubKeyTS,
+		Id2AddrMap:      id2AddrMap,
+		Id2PortMap:      id2PortMap,
+		MaxPool:         maxPool,
+		LogLevel:        logLevel,
+		Timeout:         timeOut,
+		NetworkDelay:    networkDelay,
+		DDoS:            ddos,
+		MaxPayloadSize:  maxPayloadSize,
+		MaxPayloadCount: maxPayloadCount,
+		Rate:            rate,
+		TxSize:          txSize,
 	}
 
 	conf.N = len(id2NameMap)
@@ -82,6 +95,12 @@ func LoadConfig(configPrefix, configName string) (*Config, error) {
 	logLevel := viperConfig.GetInt("log_level")
 	maxPool := viperConfig.GetInt("max_pool")
 	timeOut := viperConfig.GetInt("timeout")
+	networkDelay := viperConfig.GetInt("network_delay")
+	ddos := viperConfig.GetBool("ddos")
+	maxPayloadSize := viperConfig.GetInt("max_payload_size")
+	maxPayloadCount := viperConfig.GetInt("max_payload_count")
+	rate := viperConfig.GetInt("rate")
+	txSize := viperConfig.GetInt("tx_size")
 
 	idStringNameMap := viperConfig.GetStringMapString("id_name")
 	id2NameMap := make(map[int]string)
@@ -139,5 +158,5 @@ func LoadConfig(configPrefix, configName string) (*Config, error) {
 	}
 
 	return New(id, name, id2NameMap, name2IdMap, addr, p2pPort, tsShareKey, tsPubKey, id2AddrMap, id2P2PPortMap,
-		maxPool, logLevel, timeOut), nil
+		maxPool, logLevel, timeOut, networkDelay, ddos, maxPayloadSize, maxPayloadCount, rate, txSize), nil
 }

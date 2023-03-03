@@ -30,9 +30,13 @@ type Node struct {
 
 	committedHeight    int
 	maxProofedHeight   int
-	proofedHeight      map[int]bool
+	proofedHeight      map[int]int
 	startedSMVBAHeight int
 	startedHSHeight    int
+
+	// mock the transactions sent from clients
+	lastBlockCreatedTime time.Time
+	maxCachedTxs         int
 
 	sync.Mutex
 }
@@ -47,7 +51,8 @@ func NewNode(conf *config.Config) *Node {
 		abaMap:            map[int]*ABA{},
 
 		committedHeight: -1,
-		proofedHeight:   make(map[int]bool),
+		proofedHeight:   make(map[int]int),
+		maxCachedTxs:    conf.MaxPayloadCount * (conf.MaxPayloadSize / conf.TxSize),
 	}
 
 	node.logger = hclog.New(&hclog.LoggerOptions{
@@ -134,11 +139,20 @@ func (n *Node) HandleMsgsLoop() {
 			}
 		case data := <-n.readyData:
 
+			curTime := time.Now()
+			estimatdTxNum := int(curTime.Sub(n.lastBlockCreatedTime).Seconds() * float64(n.Config.Rate))
+			if estimatdTxNum > n.maxCachedTxs {
+				estimatdTxNum = n.maxCachedTxs
+			}
+
 			newBlock := &Block{
+				TxNum:    estimatdTxNum,
 				Reqs:     nil,
 				Height:   data.Height + 1,
 				Proposer: n.Id,
 			}
+
+			n.lastBlockCreatedTime = curTime
 
 			if data.ComponentId == 0 {
 				// update status by the optimistic path
@@ -147,6 +161,8 @@ func (n *Node) HandleMsgsLoop() {
 				if data.Height > n.committedHeight {
 					// update status by the pessimistic path
 					n.committedHeight = data.Height
+					// switch to the next leader
+					n.Hs.LeaderId = (n.Hs.LeaderId + 1) % n.Config.N
 					n.logger.Info("commit the block from the final ABA", "replica", n.Name, "block_index", data.Height)
 				}
 			}
@@ -182,16 +198,16 @@ func (n *Node) LaunchPessimisticPath(blk *Block) {
 		n.restoreMessages(blk.Height)
 		go func(blk *Block) {
 			// For testing: to let the pessimistic path run slower
-			time.Sleep(time.Millisecond * 500)
+			//time.Sleep(time.Millisecond * 500)
 
 			n.smvbaMap[blk.Height].RunOneMVBAView(false,
-				[]byte(fmt.Sprintf("%d", blk.Height)), nil, -1)
+				[]byte(fmt.Sprintf("%d", blk.Height)), nil, blk.TxNum, -1)
 		}(blk)
 	}
 }
 
 func (n *Node) updateStatusByOptimisticData(data *ReadyData) {
-	n.logger.Info("Update the node status", "replica", n.Name, "data", data)
+	n.logger.Debug("Update the node status", "replica", n.Name, "data", data)
 	n.Lock()
 	defer n.Unlock()
 
@@ -202,13 +218,13 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData) {
 		return
 	} else {
 		// previous height has not been committed
-		n.proofedHeight[prevHeight] = true
+		n.proofedHeight[prevHeight] = data.TxCount
 		n.maxProofedHeight = prevHeight
 
 		// call ABA with the optimistic return
 		if n.abaMap[prevHeight] == nil {
 			n.abaMap[prevHeight] = NewABA(n, prevHeight)
-			go n.abaMap[prevHeight].inputValue(prevHeight, 0)
+			go n.abaMap[prevHeight].inputValue(prevHeight, data.TxCount, 0)
 		}
 	}
 
@@ -228,8 +244,9 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData) {
 
 // tryCommit must be wrapped in a lock
 func (n *Node) tryCommit(height int) error {
-	if _, ok := n.proofedHeight[height-2]; ok {
-		n.logger.Info("commit the block from the optimistic path", "replica", n.Name, "block_index", height-2)
+	if txNum, ok := n.proofedHeight[height-2]; ok {
+		n.logger.Info("commit the block from the optimistic path", "replica", n.Name, "block_index", height-2,
+			"tx_num", txNum)
 		// Todo: check the consecutive commitment
 		n.committedHeight = height - 2
 		delete(n.proofedHeight, height-2)
@@ -321,6 +338,7 @@ func (n *Node) SendMsg(tag byte, data interface{}, sig []byte, addrPort string) 
 	if err != nil {
 		return err
 	}
+	//time.Sleep(time.Millisecond * 1000)
 	if err := conn.SendMsg(c, tag, data, sig); err != nil {
 		return err
 	}
@@ -333,13 +351,14 @@ func (n *Node) SendMsg(tag byte, data interface{}, sig []byte, addrPort string) 
 
 // PlainBroadcast broadcasts data in its best effort
 func (n *Node) PlainBroadcast(tag byte, data interface{}, sig []byte) error {
-	for id, addr := range n.Id2AddrMap {
-		port := n.Id2PortMap[id]
-		addrPort := addr + ":" + port
-		err := n.SendMsg(tag, data, sig, addrPort)
-		if err != nil {
-			return err
-		}
+	for i, a := range n.Id2AddrMap {
+		go func(id int, addr string) {
+			port := n.Id2PortMap[id]
+			addrPort := addr + ":" + port
+			if err := n.SendMsg(tag, data, sig, addrPort); err != nil {
+				panic(err)
+			}
+		}(i, a)
 	}
 	return nil
 }

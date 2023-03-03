@@ -88,6 +88,12 @@ func main() {
 	logLevel := viperRead.GetInt("log_level")
 	maxPool := viperRead.GetInt("max_pool")
 	timeOut := viperRead.GetInt("timeout")
+	network_delay := viperRead.GetInt("network_delay")
+	ddos := viperRead.GetBool("ddos")
+	max_payload_size := viperRead.GetInt("max_payload_size")
+	max_payload_count := viperRead.GetInt("max_payload_count")
+	rate := viperRead.GetInt("rate")
+	tx_size := viperRead.GetInt("tx_size")
 
 	// write to configure files
 	for i, name := range idNameMap {
@@ -115,6 +121,12 @@ func main() {
 		viperWrite.Set("timeout", timeOut)
 		viperWrite.Set("id_name", idNameMap)
 		viperWrite.Set("id_ip", idIPMap)
+		viperWrite.Set("network_delay", network_delay)
+		viperWrite.Set("ddos", ddos)
+		viperWrite.Set("max_payload_size", max_payload_size)
+		viperWrite.Set("max_payload_count", max_payload_count)
+		viperWrite.Set("rate", rate)
+		viperWrite.Set("tx_size", tx_size)
 		viperWrite.WriteConfig()
 	}
 }

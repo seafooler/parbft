@@ -95,7 +95,7 @@ func NewABA(node *Node, height int) *ABA {
 
 // inputValue will set the given val as the initial value to be proposed in the
 // Agreement.
-func (b *ABA) inputValue(h int, cId uint8) error {
+func (b *ABA) inputValue(h, txCount int, cId uint8) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	b.aLogger.Info("!!!!!!!!!!!!!!!!!!!! ABA is launched !!!!!!!!!!!!!!!!!!!!", "replica", b.node.Name,
@@ -116,10 +116,11 @@ func (b *ABA) inputValue(h int, cId uint8) error {
 		b.mapValue[1] = h
 	}
 	msg := ABABvalRequestMsg{
-		Height: h,
-		Sender: b.node.Id,
-		Round:  b.round,
-		BValue: cId,
+		Height:  h,
+		Sender:  b.node.Id,
+		TxCount: txCount,
+		Round:   b.round,
+		BValue:  cId,
 	}
 	return b.node.PlainBroadcast(ABABvalRequestMsgTag, msg, nil)
 }
@@ -161,10 +162,11 @@ func (b *ABA) handleBvalRequest(msg *ABABvalRequestMsg) error {
 		}
 		b.sentBvals[msg.Round] = sb
 		m := ABABvalRequestMsg{
-			Height: msg.Height,
-			Sender: b.node.Id,
-			Round:  msg.Round,
-			BValue: msg.BValue,
+			Height:  msg.Height,
+			Sender:  b.node.Id,
+			TxCount: msg.TxCount,
+			Round:   msg.Round,
+			BValue:  msg.BValue,
 		}
 		if err := b.node.PlainBroadcast(ABABvalRequestMsgTag, m, nil); err != nil {
 			return err
@@ -188,17 +190,18 @@ func (b *ABA) handleBvalRequest(msg *ABABvalRequestMsg) error {
 		if wasEmptyBinValues {
 			parSig := sign_tools.SignTSPartial(b.node.PriKeyTS, []byte(fmt.Sprint(b.round)))
 			m := ABAAuxRequestMsg{
-				Height: msg.Height,
-				Sender: b.node.Id,
-				Round:  b.round,
-				BValue: msg.BValue,
-				TSPar:  parSig,
+				Height:  msg.Height,
+				TxCount: msg.TxCount,
+				Sender:  b.node.Id,
+				Round:   b.round,
+				BValue:  msg.BValue,
+				TSPar:   parSig,
 			}
 			if err := b.node.PlainBroadcast(ABAAuxRequestMsgTag, m, nil); err != nil {
 				return err
 			}
 		}
-		b.tryOutputAgreement(msg.Height)
+		b.tryOutputAgreement(msg.Height, msg.TxCount)
 	}
 	return nil
 }
@@ -227,14 +230,14 @@ func (b *ABA) handleAuxRequest(msg *ABAAuxRequestMsg) error {
 
 	b.recvAux[msg.Sender] = msg.BValue
 	b.recvParSig = append(b.recvParSig, msg.TSPar)
-	b.tryOutputAgreement(msg.Height)
+	b.tryOutputAgreement(msg.Height, msg.TxCount)
 	return nil
 }
 
 // tryOutputAgreement waits until at least (N - f) output messages received,
 // once the (N - f) messages are received, make a common coin and uses it to
 // compute the next decision estimate and output the optional decision value.
-func (b *ABA) tryOutputAgreement(height int) {
+func (b *ABA) tryOutputAgreement(height, txCount int) {
 	if len(b.binValues) == 0 {
 		return
 	}
@@ -269,9 +272,10 @@ func (b *ABA) tryOutputAgreement(height int) {
 			b.hasSentExitMsg = true
 
 			msg := ABAExitMsg{
-				Height: height,
-				Sender: b.node.Id,
-				Value:  b.mapValue[0], // Todo: fix it
+				Height:  height,
+				Sender:  b.node.Id,
+				TxCount: txCount,
+				Value:   b.mapValue[0], // Todo: fix it
 			}
 			if err := b.node.PlainBroadcast(ABAExitMsgTag, msg, nil); err != nil {
 				b.aLogger.Error(err.Error())
@@ -292,10 +296,11 @@ func (b *ABA) tryOutputAgreement(height int) {
 	}
 
 	msg := ABABvalRequestMsg{
-		Height: height,
-		Sender: b.node.Id,
-		Round:  b.round,
-		BValue: estimated,
+		Height:  height,
+		Sender:  b.node.Id,
+		TxCount: txCount,
+		Round:   b.round,
+		BValue:  estimated,
 	}
 	if err := b.node.PlainBroadcast(ABABvalRequestMsgTag, msg, nil); err != nil {
 		b.aLogger.Error(err.Error(), "replica", b.node.Id)
@@ -364,9 +369,10 @@ func (b *ABA) handleExitMessage(msg *ABAExitMsg) error {
 	if lenEM == b.node.F+1 && !b.hasSentExitMsg {
 		b.hasSentExitMsg = true
 		m := ABAExitMsg{
-			Height: msg.Height,
-			Sender: b.node.Id,
-			Value:  msg.Value,
+			Height:  msg.Height,
+			Sender:  b.node.Id,
+			TxCount: msg.TxCount,
+			Value:   msg.Value,
 		}
 		if err := b.node.PlainBroadcast(ABAExitMsgTag, m, nil); err != nil {
 			b.aLogger.Error(err.Error(), "replica", b.node.Id)
@@ -384,6 +390,7 @@ func (b *ABA) handleExitMessage(msg *ABAExitMsg) error {
 		go func() {
 			b.node.readyData <- ReadyData{
 				ComponentId: 1,
+				TxCount:     msg.TxCount,
 				Height:      msg.Height,
 			}
 		}()

@@ -22,6 +22,7 @@ type SMVBA struct {
 	logger hclog.Logger
 
 	inProcessData, inProcessProof []byte
+	inProcessTxNum                int
 
 	finishMessagesMap map[int]map[string]*SMVBAFinishMessage
 	lockMessageMap    map[int]map[string]*SMVBAPBVALMessage
@@ -92,8 +93,8 @@ func (s *SMVBA) Output() []byte {
 }
 
 // BroadcastViaSPB encapsulates the inner functions of calling SPB
-func (s *SMVBA) BroadcastViaSPB(data, proof []byte, view int) (chan SMVBAQCedData, error) {
-	return s.spb.SPBBroadcastData(data, proof, view)
+func (s *SMVBA) BroadcastViaSPB(data, proof []byte, txCount, view int) (chan SMVBAQCedData, error) {
+	return s.spb.SPBBroadcastData(data, proof, txCount, view)
 }
 
 // VerifyTS verifies the data's threshold signature
@@ -128,6 +129,7 @@ func (s *SMVBA) HandleFinishMsg(fMsg *SMVBAFinishMessage) {
 		Height:  fMsg.Height,
 		TSShare: coinShare,
 		Sender:  s.node.Name,
+		TxCount: fMsg.TxCount,
 		View:    fMsg.View,
 	}
 
@@ -155,13 +157,13 @@ func (s *SMVBA) HandleFinishMsg(fMsg *SMVBAFinishMessage) {
 			s.logger.Debug("Abandon all the SPBs", "replica", s.node.Name, "s.Height", s.height, "view", s.view,
 				"fMsg.View", fMsg.View)
 			coin2NodeName := s.node.Id2NameMap[coin]
-			s.HaltOrPreVote(fMsg.Height, fMsg.View, coin2NodeName)
+			s.HaltOrPreVote(fMsg.Height, fMsg.View, fMsg.TxCount, coin2NodeName)
 		}
 	}
 }
 
-func (s *SMVBA) RunOneMVBAView(usePrevData bool, data, proof []byte, v int) error {
-	s.logger.Info("RunOneMVBAView is called", "replica", s.node.Name, "Height", s.height, "view", v)
+func (s *SMVBA) RunOneMVBAView(usePrevData bool, data, proof []byte, txCount, v int) error {
+	s.logger.Debug("RunOneMVBAView is called", "replica", s.node.Name, "Height", s.height, "view", v)
 	s.Lock()
 
 	if s.output != nil {
@@ -183,6 +185,7 @@ func (s *SMVBA) RunOneMVBAView(usePrevData bool, data, proof []byte, v int) erro
 		// cache the call
 		s.readyViewDataMap[s.view] = &SMVBAReadyViewData{
 			usePrevData: usePrevData,
+			txCount:     txCount,
 			data:        data,
 			proof:       proof,
 		}
@@ -196,6 +199,7 @@ func (s *SMVBA) RunOneMVBAView(usePrevData bool, data, proof []byte, v int) erro
 	s.AdvanceView()
 	if !usePrevData {
 		s.inProcessData = data
+		s.inProcessTxNum = txCount
 	}
 	s.inProcessProof = proof
 	s.Unlock()
@@ -204,14 +208,14 @@ func (s *SMVBA) RunOneMVBAView(usePrevData bool, data, proof []byte, v int) erro
 	if rvd, ok := s.readyViewDataMap[s.view]; ok {
 		s.logger.Debug("Retrieve a cached readyViewData and run the next view directly", "replica", s.node.Name,
 			"s.Height", s.height, "s.view", s.view)
-		go s.RunOneMVBAView(rvd.usePrevData, rvd.data, rvd.proof, s.view)
+		go s.RunOneMVBAView(rvd.usePrevData, rvd.data, rvd.proof, rvd.txCount, s.view)
 		return nil
 	}
 
 	// Phase 1: SPB phase
 	s.logger.Debug("Run a new view by calling the SPB", "replica", s.node.Name, "s.Height", s.height,
 		"view", s.view, "data", string(s.inProcessData), "usePrevData", usePrevData)
-	qcedDataCh, err := s.BroadcastViaSPB(s.inProcessData, s.inProcessProof, s.view)
+	qcedDataCh, err := s.BroadcastViaSPB(s.inProcessData, s.inProcessProof, s.inProcessTxNum, s.view)
 	if err != nil {
 		return err
 	}
@@ -234,11 +238,12 @@ func (s *SMVBA) RunOneMVBAView(usePrevData bool, data, proof []byte, v int) erro
 		"view", s.view)
 
 	finishMsg := SMVBAFinishMessage{
-		Height: qcedData.Height,
-		Data:   qcedData.Data,
-		QC:     qcedData.QC,
-		Dealer: s.node.Name,
-		View:   s.view,
+		Height:  qcedData.Height,
+		TxCount: qcedData.TxCount,
+		Data:    qcedData.Data,
+		QC:      qcedData.QC,
+		Dealer:  s.node.Name,
+		View:    s.view,
 	}
 
 	s.logger.Debug("finishMsg's Data", "replica", s.node.Name,
@@ -334,11 +339,11 @@ func (s *SMVBA) HandleDoneShareMsg(msg *SMVBADoneShareMessage) {
 	s.abandon[msg.View] = true
 	s.logger.Debug("Abandon all the SPBs", "replica", s.node.Name, "s.Height", s.height, "s.view", s.view, "msg.View", msg.View)
 
-	s.HaltOrPreVote(msg.Height, msg.View, coin2NodeName)
+	s.HaltOrPreVote(msg.Height, msg.View, msg.TxCount, coin2NodeName)
 }
 
 // HaltOrPreVote must be called by a wrapped lock
-func (s *SMVBA) HaltOrPreVote(h, v int, coinNode string) {
+func (s *SMVBA) HaltOrPreVote(h, v, txCount int, coinNode string) {
 	s.logger.Debug("HaltOrPreVote is called", "replica", s.node.Name,
 		"s.Height", s.height, "view", v)
 	finishMsgByCoin := s.finishMessagesMap[v][coinNode]
@@ -349,17 +354,18 @@ func (s *SMVBA) HaltOrPreVote(h, v int, coinNode string) {
 			"dealer", finishMsgByCoin.Dealer, "data", string(s.output))
 		// broadcast halt messages
 		hm := SMVBAHaltMessage{
-			Height: h,
-			Value:  finishMsgByCoin.Data,
-			Proof:  finishMsgByCoin.QC,
-			View:   v,
-			Dealer: finishMsgByCoin.Dealer,
+			Height:  h,
+			TxCount: txCount,
+			Value:   finishMsgByCoin.Data,
+			Proof:   finishMsgByCoin.QC,
+			View:    v,
+			Dealer:  finishMsgByCoin.Dealer,
 		}
 
 		go s.node.PlainBroadcast(SMVBAHaltTag, hm, nil)
 		s.logger.Info("Return from SMVBA", "replica", s.node.Name, "Height", h, "View", v,
 			"dealer", finishMsgByCoin.Dealer, "data", string(s.output))
-		go s.node.abaMap[hm.Height].inputValue(hm.Height, 1)
+		go s.node.abaMap[hm.Height].inputValue(hm.Height, txCount, 1)
 
 		// send a signal to suspend this round of MVBA or receiving a signal that MVBA has been suspended
 		s.logger.Debug("Before sending a signal to outputCh or receiving a signal from stopCh in HaltOrPreVote",
@@ -378,11 +384,11 @@ func (s *SMVBA) HaltOrPreVote(h, v int, coinNode string) {
 		s.preVoteSent[v] = true
 		s.logger.Debug("Broadcast PreVote message", "replica", s.node.Name, "s.Height", s.height, "View", v)
 		// No Finish message corresponding to the coin is received, start the view change
-		go s.BroadcastPreVote(h, v)
+		go s.BroadcastPreVote(h, v, txCount)
 	}
 }
 
-func (s *SMVBA) BroadcastPreVote(h, v int) error {
+func (s *SMVBA) BroadcastPreVote(h, v, txCount int) error {
 	s.logger.Debug("BroadcastPreVote is called", "replica", s.node.Name,
 		"s.Height", s.height, "View", v)
 	// Attempt to fetch the lock data corresponding to coin
@@ -390,10 +396,11 @@ func (s *SMVBA) BroadcastPreVote(h, v int) error {
 	// TODO: bug?
 	lockData, ok := s.lockMessageMap[v][coin2NodeName]
 	pvm := SMVBAPreVoteMessage{
-		Height: h,
-		Dealer: coin2NodeName,
-		Sender: s.node.Name,
-		View:   v,
+		Height:  h,
+		TxCount: txCount,
+		Dealer:  coin2NodeName,
+		Sender:  s.node.Name,
+		View:    v,
 	}
 	if ok {
 		// lock data exists
@@ -423,10 +430,11 @@ func (s *SMVBA) HandlePreVoteMsg(pvm *SMVBAPreVoteMessage) {
 
 	coin2NodeName := s.node.Id2NameMap[s.coin[pvm.View]]
 	vm := SMVBAVoteMessage{
-		Height: pvm.Height,
-		Dealer: coin2NodeName,
-		Sender: s.node.Name,
-		View:   pvm.View,
+		Height:  pvm.Height,
+		TxCount: pvm.TxCount,
+		Dealer:  coin2NodeName,
+		Sender:  s.node.Name,
+		View:    pvm.View,
 	}
 
 	// Check if pvm has a flag of true
@@ -532,17 +540,18 @@ func (s *SMVBA) HandleVoteMsg(vm *SMVBAVoteMessage) {
 
 			// broadcast halt messages
 			hm := SMVBAHaltMessage{
-				Height: vm.Height,
-				Value:  vm.Value,
-				Proof:  intactTS,
-				View:   vm.View,
-				Dealer: vm.Dealer,
+				Height:  vm.Height,
+				TxCount: vm.TxCount,
+				Value:   vm.Value,
+				Proof:   intactTS,
+				View:    vm.View,
+				Dealer:  vm.Dealer,
 			}
 
 			go s.node.PlainBroadcast(SMVBAHaltTag, hm, nil)
 			s.logger.Info("Return from SMVBA", "replica", s.node.Name, "s.Height", s.height,
 				"msg.View", vm.View, "dealer", vm.Dealer, "data", string(s.output))
-			go s.node.abaMap[hm.Height].inputValue(hm.Height, 1)
+			go s.node.abaMap[hm.Height].inputValue(hm.Height, vm.TxCount, 1)
 
 			// send a signal to suspend this round of MVBA
 			s.logger.Debug("Before sending a signal to outputCh or receiving a signal from stopCh in HandleVoteMsg",
@@ -560,6 +569,7 @@ func (s *SMVBA) HandleVoteMsg(vm *SMVBAVoteMessage) {
 		}
 
 		var dataForNewView, proofForNewView []byte
+		var txCountForNewView int
 		if falseCount == 2*s.node.F+1 {
 			// 2f+1 false votes
 			data := []byte(fmt.Sprintf("%s%v%T", msgTagNameMap[SMVBAVoteTag], vm.View, false))
@@ -572,9 +582,10 @@ func (s *SMVBA) HandleVoteMsg(vm *SMVBAVoteMessage) {
 		} else {
 			dataForNewView = someVoteMsgTrue.Value
 			proofForNewView = someVoteMsgTrue.Proof
+			txCountForNewView = someVoteMsgTrue.TxCount
 		}
 
-		go s.RunOneMVBAView(usePrevData, dataForNewView, proofForNewView, vm.View)
+		go s.RunOneMVBAView(usePrevData, dataForNewView, proofForNewView, txCountForNewView, vm.View)
 
 	}
 
@@ -596,7 +607,7 @@ func (s *SMVBA) HandleHaltMsg(hm *SMVBAHaltMessage) {
 		go s.node.PlainBroadcast(SMVBAHaltTag, *hm, nil)
 		s.logger.Info("Return from SMVBA", "replica", s.node.Name, "s.Height", s.height, "View", s.view,
 			"dealer", hm.Dealer, "data", string(s.output))
-		go s.node.abaMap[hm.Height].inputValue(hm.Height, 1)
+		go s.node.abaMap[hm.Height].inputValue(hm.Height, hm.TxCount, 1)
 
 		// send a signal to suspend this round of MVBA
 		s.logger.Debug("Before sending a signal to outputCh or receiving a signal from stopCh in HandleHaltMsg",

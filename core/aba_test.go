@@ -43,7 +43,7 @@ func testAgreement(t *testing.T, inputs []uint8, startPort int, expected bool, e
 	}
 
 	for i, node := range nodes {
-		if err := node.abaMap[0].inputValue(0, inputs[i]); err != nil {
+		if err := node.abaMap[0].inputValue(0, 1000, inputs[i]); err != nil {
 			t.Fatal(err)
 		}
 
