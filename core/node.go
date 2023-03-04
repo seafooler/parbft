@@ -76,6 +76,22 @@ func (n *Node) StartP2PListen() error {
 	return nil
 }
 
+// BroadcastPayLoad mocks the underlying payload broadcast
+func (n *Node) BroadcastPayLoad() {
+	payLoadFullTime := n.Config.MaxPayloadSize / (n.Config.TxSize * n.Rate)
+	for {
+		time.Sleep(time.Duration(payLoadFullTime) * time.Second)
+		payLoadMsg := PayLoadMsg{
+			Reqs: make([][]byte, n.Rate*payLoadFullTime),
+		}
+		for i := 0; i < n.Rate*payLoadFullTime; i++ {
+			payLoadMsg.Reqs[i] = make([]byte, n.Config.TxSize)
+			payLoadMsg.Reqs[i][n.Config.TxSize-1] = '0'
+		}
+		n.PlainBroadcast(PayLoadMsgTag, payLoadMsg, nil)
+	}
+}
+
 // HandleMsgsLoop starts a loop to deal with the msgs from other peers.
 func (n *Node) HandleMsgsLoop() {
 	msgCh := n.trans.MsgChan()
@@ -134,6 +150,8 @@ func (n *Node) HandleMsgsLoop() {
 				if n.processItNow(msgAsserted.Height, msgAsserted) {
 					go n.abaMap[msgAsserted.Height].handleExitMessage(&msgAsserted)
 				}
+			case PayLoadMsg:
+				continue
 			default:
 				n.logger.Error("Unknown type of the received message!")
 			}

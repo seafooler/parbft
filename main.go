@@ -58,8 +58,5 @@ func main() {
 	// launch the pessimistic path
 	node.LaunchPessimisticPath(newBlock)
 
-	for {
-		time.Sleep(time.Second)
-	}
-
+	node.BroadcastPayLoad()
 }

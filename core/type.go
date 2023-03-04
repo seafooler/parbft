@@ -17,6 +17,7 @@ const (
 	SMVBAPreVoteTag
 	SMVBAVoteTag
 	SMVBAHaltTag
+	PayLoadMsgTag
 )
 
 var msgTagNameMap = map[uint8]string{
@@ -33,6 +34,10 @@ type Block struct {
 	Reqs     []byte
 	Height   int
 	Proposer int
+}
+
+type PayLoadMsg struct {
+	Reqs [][]byte
 }
 
 type HSProposalMsg struct {
@@ -197,6 +202,7 @@ var smvbaDoneShareMsg SMVBADoneShareMessage
 var smvbaPreVoteMsg SMVBAPreVoteMessage
 var smvbaVoteMsg SMVBAVoteMessage
 var smvbaHaltMsg SMVBAHaltMessage
+var payLoadMsg PayLoadMsg
 
 var reflectedTypesMap = map[uint8]reflect.Type{
 	HSProposalMsgTag:     reflect.TypeOf(hpMsg),
@@ -211,4 +217,5 @@ var reflectedTypesMap = map[uint8]reflect.Type{
 	SMVBAPreVoteTag:      reflect.TypeOf(smvbaPreVoteMsg),
 	SMVBAVoteTag:         reflect.TypeOf(smvbaVoteMsg),
 	SMVBAHaltTag:         reflect.TypeOf(smvbaHaltMsg),
+	PayLoadMsgTag:        reflect.TypeOf(payLoadMsg),
 }
