@@ -78,13 +78,14 @@ func (n *Node) StartP2PListen() error {
 
 // BroadcastPayLoad mocks the underlying payload broadcast
 func (n *Node) BroadcastPayLoad() {
-	payLoadFullTime := n.Config.MaxPayloadSize / (n.Config.TxSize * n.Rate)
+	payLoadFullTime := 1000 * float32(n.Config.MaxPayloadSize) / float32(n.Config.TxSize*n.Rate)
 	for {
-		time.Sleep(time.Duration(payLoadFullTime) * time.Second)
+		time.Sleep(time.Duration(payLoadFullTime) * time.Millisecond)
+		txNum := int(float32(n.Rate) * payLoadFullTime)
 		payLoadMsg := PayLoadMsg{
-			Reqs: make([][]byte, n.Rate*payLoadFullTime),
+			Reqs: make([][]byte, txNum),
 		}
-		for i := 0; i < n.Rate*payLoadFullTime; i++ {
+		for i := 0; i < txNum; i++ {
 			payLoadMsg.Reqs[i] = make([]byte, n.Config.TxSize)
 			payLoadMsg.Reqs[i][n.Config.TxSize-1] = '0'
 		}
