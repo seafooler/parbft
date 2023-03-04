@@ -16,21 +16,15 @@ class PathMaker:
 
     @staticmethod
     def node_crate_path():
-        return join('/home/ubuntu', 'parbft')
+        return join('..', 'node')
 
     @staticmethod
     def committee_file():
         return '.committee.json'
 
-
     @staticmethod
     def parameters_file():
         return '.parameters.json'
-
-    @staticmethod
-    def config_file(i):
-        assert isinstance(i, int) and i >= 0
-        return f'node{i}.yaml'
 
     @staticmethod
     def key_file(i):
@@ -41,7 +35,7 @@ class PathMaker:
     def threshold_key_file(i):
         assert isinstance(i, int) and i >= 0
         return f'.node-tss-{i}.json'
-
+        
     @staticmethod
     def db_path(i):
         assert isinstance(i, int) and i >= 0
@@ -66,9 +60,9 @@ class PathMaker:
         return 'results'
 
     @staticmethod
-    def result_file(nodes, tx_size, faults):
+    def result_file(nodes, rate, tx_size, faults):
         return join(
-            PathMaker.results_path(), f'bench-{nodes}-{tx_size}-{faults}.txt'
+            PathMaker.results_path(), f'bench-{nodes}-{rate}-{tx_size}-{faults}.txt'
         )
 
     @staticmethod

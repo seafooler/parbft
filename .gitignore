@@ -2,3 +2,6 @@
 go.sum
 config_gen/node*.yaml
 parbft
+benchmark/node*.yaml
+.DS_Store
+benchmark/logs

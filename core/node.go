@@ -90,6 +90,7 @@ func (n *Node) BroadcastPayLoad() {
 			payLoadMsg.Reqs[i][n.Config.TxSize-1] = '0'
 		}
 		n.PlainBroadcast(PayLoadMsgTag, payLoadMsg, nil)
+		time.Sleep(time.Millisecond * 100)
 	}
 }
 

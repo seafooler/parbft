@@ -9,10 +9,10 @@ from math import ceil
 from os.path import join
 import subprocess
 
-from benchmark.benchmark.config import BenchParameters, ConfigError
-from benchmark.benchmark.utils import BenchError, Print, PathMaker, progress_bar
-from benchmark.benchmark.commands import CommandMaker
-from benchmark.benchmark.logs import LogParser, ParseError
+from benchmark.config import BenchParameters, ConfigError
+from benchmark.utils import BenchError, Print, PathMaker, progress_bar
+from benchmark.commands import CommandMaker
+from benchmark.logs import LogParser, ParseError
 from aws.instance import InstanceManager
 
 
@@ -52,7 +52,7 @@ class Bench:
                 raise ExecutionError(output.stderr)
 
     def install(self):
-        Print.info('Installing golng and cloning the repo...')
+        Print.info('Installing golang and cloning the repo...')
         cmd = [
             'sudo apt-get update',
             'sudo apt-get -y upgrade',
@@ -64,10 +64,10 @@ class Bench:
 
             # Install golang
             'wget https://go.dev/dl/go1.18.linux-amd64.tar.gz',
-            'tar -zxvf go1.18.linux-amd64.tar.gz'
-            'sudo mv go /usr/local'
-            'echo \'export PATH=$PATH:/usr/local/go/bin\' >> ~/.bashrc'
-            'source ~/.bashrc'
+            'tar -zxvf go1.18.linux-amd64.tar.gz',
+            'sudo mv go /usr/local',
+            'echo \'export PATH=$PATH:/usr/local/go/bin\' >> ~/.bashrc',
+            'source ~/.bashrc',
 
             # Clone the repo.
             f'(git clone {self.settings.repo_url} || (cd {self.settings.repo_name} ; git pull))'
@@ -122,14 +122,21 @@ class Bench:
             f'(cd {self.settings.repo_name} && git checkout -f {self.settings.branch})',
             f'(cd {self.settings.repo_name} && git pull -f)',
             f'(cd {self.settings.repo_name} && {CommandMaker.compile()})',
+            CommandMaker.alias_binaries(
+                f'./{self.settings.repo_name}/'
+            )
         ]
         g = Group(*hosts, user='ubuntu', connect_kwargs=self.connect)
         g.run(' && '.join(cmd), hide=True)
 
-    def _config(self, hosts, node_parameters):
+    def _config(self, hosts):
         Print.info('Generating configuration files...')
-        cmd = 'cd ../../config_gen && go run main.go'
-        subprocess.run(cmd, capture_output=True, check=True)
+        # Cleanup all local configuration files.
+        cmd = CommandMaker.cleanup()
+        subprocess.run([cmd], shell=True, stderr=subprocess.DEVNULL)
+
+        cmd = 'cd /vagrant/parbft/config_gen/ && go run main.go'
+        subprocess.run([cmd], shell=True, stderr=subprocess.DEVNULL)
 
         # Cleanup all nodes.
         cmd = f'{CommandMaker.cleanup()} || true'
@@ -140,7 +147,7 @@ class Bench:
         progress = progress_bar(hosts, prefix='Uploading config files:')
         for i, host in enumerate(progress):
             c = Connection(host, user='ubuntu', connect_kwargs=self.connect)
-            c.put(PathMaker.config_file(i), '.')
+            c.put(PathMaker.config_file(i), './config.yaml')
 
         return
 
@@ -179,9 +186,6 @@ class Bench:
         for i, host in enumerate(progress):
             c = Connection(host, user='ubuntu', connect_kwargs=self.connect)
             c.get(PathMaker.node_log_file(i), local=PathMaker.node_log_file(i))
-            c.get(
-                PathMaker.client_log_file(i), local=PathMaker.client_log_file(i)
-            )
 
         # Parse logs and return the parser.
         Print.info('Parsing logs and computing performance...')
@@ -217,33 +221,32 @@ class Bench:
         # Upload all configuration files.
         try:
             self._config(hosts)
+            # self._config()
         except (subprocess.SubprocessError, GroupException) as e:
             e = FabricError(e) if isinstance(e, GroupException) else e
             Print.error(BenchError('Failed to configure nodes', e))
 
         # Run benchmarks.
         for n in bench_parameters.nodes:
-            for r in bench_parameters.rate:
-                Print.heading(f'\nRunning {n} nodes (input rate: {r:,} tx/s)')
-                hosts = selected_hosts[:n]
+            hosts = selected_hosts[:n]
 
-                # Do not boot faulty nodes.
-                faults = bench_parameters.faults
-                hosts = hosts[:n-faults]
+            # Do not boot faulty nodes.
+            faults = bench_parameters.faults
+            hosts = hosts[:n-faults]
 
-                # Run the benchmark.
-                for i in range(bench_parameters.runs):
-                    Print.heading(f'Run {i+1}/{bench_parameters.runs}')
-                    try:
-                        self._run_single(
-                            hosts, r, bench_parameters, debug
-                        )
-                        self._logs(hosts, faults).print(PathMaker.result_file(
-                            n, r, bench_parameters.tx_size, faults
-                        ))
-                    except (subprocess.SubprocessError, GroupException, ParseError) as e:
-                        self.kill(hosts=hosts)
-                        if isinstance(e, GroupException):
-                            e = FabricError(e)
-                        Print.error(BenchError('Benchmark failed', e))
-                        continue
+            # Run the benchmark.
+            for i in range(bench_parameters.runs):
+                Print.heading(f'Run {i+1}/{bench_parameters.runs}')
+                try:
+                    self._run_single(
+                        hosts, bench_parameters
+                    )
+                    self._logs(hosts, faults).print(PathMaker.result_file(
+                        n, bench_parameters.tx_size, faults
+                    ))
+                except (subprocess.SubprocessError, GroupException, ParseError) as e:
+                    self.kill(hosts=hosts)
+                    if isinstance(e, GroupException):
+                        e = FabricError(e)
+                    Print.error(BenchError('Benchmark failed', e))
+                    continue

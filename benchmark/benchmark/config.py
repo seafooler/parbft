@@ -13,16 +13,10 @@ class BenchParameters:
             if not nodes or any(x <= 0 for x in nodes):
                 raise ConfigError('Missing or invalid number of nodes')
 
-            rate = json['rate']
-            rate = rate if isinstance(rate, list) else [rate]
-            if not rate:
-                raise ConfigError('Missing input rate')
-
             self.nodes = [int(x) for x in nodes]
-            self.rate = [int(x) for x in rate]
-            self.tx_size = int(json['tx_size'])
             self.faults = int(json['faults'])
             self.duration = int(json['duration'])
+            self.timeout_delay = int(json['timeout_delay'])
             self.runs = int(json['runs']) if 'runs' in json else 1
         except KeyError as e:
             raise ConfigError(f'Malformed bench parameters: missing key {e}')

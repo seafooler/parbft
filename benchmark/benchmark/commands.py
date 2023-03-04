@@ -8,7 +8,7 @@ class CommandMaker:
     @staticmethod
     def cleanup():
         return (
-            f'rm -r .db-* ; rm .*.json ; mkdir -p {PathMaker.results_path()}'
+            f'rm .*.yaml ; mkdir -p {PathMaker.results_path()}'
         )
 
     @staticmethod
@@ -17,7 +17,7 @@ class CommandMaker:
 
     @staticmethod
     def compile():
-        return 'go mod tidy && go build .'
+        return '/usr/local/go/bin/go mod tidy && /usr/local/go/bin/go build .'
 
     @staticmethod
     def generate_key(filename):
@@ -26,7 +26,7 @@ class CommandMaker:
 
     @staticmethod
     def run_node():
-        return f'./parbft '
+        return f'./node'
 
     @staticmethod
     def run_client(address, size, rate, timeout, nodes=[]):
@@ -46,5 +46,5 @@ class CommandMaker:
     @staticmethod
     def alias_binaries(origin):
         assert isinstance(origin, str)
-        node, client = join(origin, 'node'), join(origin, 'client')
-        return f'rm node ; rm client ; ln -s {node} . ; ln -s {client} .'
+        node = join(origin, 'parbft')
+        return f'rm node ;  ln -s {node} ./node '
