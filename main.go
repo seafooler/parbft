@@ -29,7 +29,7 @@ func main() {
 	}
 
 	// wait for each node to start
-	time.Sleep(time.Second * 10)
+	time.Sleep(time.Second * time.Duration(conf.WaitTime))
 
 	if err = node.EstablishP2PConns(); err != nil {
 		panic(err)
@@ -58,5 +58,9 @@ func main() {
 	// launch the pessimistic path
 	node.LaunchPessimisticPath(newBlock)
 
-	node.BroadcastPayLoad()
+	//node.BroadcastPayLoad()
+
+	for {
+		time.Sleep(time.Second)
+	}
 }
