@@ -15,10 +15,11 @@ id_p2p_port:
   3: 8000
 log_level: 3
 max_pool: 10
-timeout: 5
-network_delay: 10
+timeout: 1000
+mock_latency: 700
 ddos: false
-max_payload_size: 500000
+max_payload_size: 5000
 max_payload_count: 1000
 rate: 1000
 tx_size: 512
+wait_time: 40

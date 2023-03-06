@@ -89,6 +89,14 @@ type ABAExitMsg struct {
 	Value   int
 }
 
+// PaceSyncMsg
+type PaceSyncMsg struct {
+	SN     int
+	Sender int
+	Epoch  int
+	Proof  []byte
+}
+
 type SMVBAViewPhase struct {
 	View  int
 	Phase uint8 // phase can only be 1 or 2
@@ -195,6 +203,7 @@ var hvMsg HSVoteMsg
 var ababrMsg ABABvalRequestMsg
 var abaarMsg ABAAuxRequestMsg
 var abaexMsg ABAExitMsg
+var psMsg PaceSyncMsg
 var smvbaPbValMsg SMVBAPBVALMessage
 var smvbaPbVoteMsg SMVBAPBVOTMessage
 var smvbaFinishMsg SMVBAFinishMessage
@@ -218,4 +227,5 @@ var reflectedTypesMap = map[uint8]reflect.Type{
 	SMVBAVoteTag:         reflect.TypeOf(smvbaVoteMsg),
 	SMVBAHaltTag:         reflect.TypeOf(smvbaHaltMsg),
 	PayLoadMsgTag:        reflect.TypeOf(payLoadMsg),
+	PaceSyncMsgTag:       reflect.TypeOf(psMsg),
 }

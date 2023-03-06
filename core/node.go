@@ -358,7 +358,7 @@ func (n *Node) SendMsg(tag byte, data interface{}, sig []byte, addrPort string) 
 	if err != nil {
 		return err
 	}
-	//time.Sleep(time.Millisecond * 1000)
+	time.Sleep(time.Millisecond * time.Duration(n.Config.MockLatency))
 	if err := conn.SendMsg(c, tag, data, sig); err != nil {
 		return err
 	}
@@ -379,6 +379,47 @@ func (n *Node) PlainBroadcast(tag byte, data interface{}, sig []byte) error {
 				panic(err)
 			}
 		}(i, a)
+	}
+	return nil
+}
+
+// BroadcastSyncLaunchMsgs sends the PaceSyncMsg to help all the replicas launch simultaneously
+func (n *Node) BroadcastSyncLaunchMsgs() error {
+	for i, a := range n.Id2AddrMap {
+		go func(id int, addr string) {
+			port := n.Id2PortMap[id]
+			addrPort := addr + ":" + port
+			c, err := n.trans.GetConn(addrPort)
+			if err != nil {
+				panic(err)
+			}
+			if err := conn.SendMsg(c, PaceSyncMsgTag, PaceSyncMsg{SN: -1, Sender: n.Id, Epoch: -1}, nil); err != nil {
+				panic(err)
+			}
+			if err = n.trans.ReturnConn(c); err != nil {
+				panic(err)
+			}
+		}(i, a)
+	}
+	return nil
+}
+
+func (n *Node) WaitForEnoughSyncLaunchMsgs() error {
+	msgCh := n.trans.MsgChan()
+	count := 0
+	for {
+		select {
+		case msg := <-msgCh:
+			switch msg.(type) {
+			case PaceSyncMsg:
+				count += 1
+				if count >= n.N-3 {
+					return nil
+				}
+			default:
+				continue
+			}
+		}
 	}
 	return nil
 }

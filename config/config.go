@@ -30,18 +30,19 @@ type Config struct {
 	MaxPool         int
 	LogLevel        int
 	Timeout         int
-	NetworkDelay    int
+	MockLatency     int
 	DDoS            bool
 	MaxPayloadSize  int
 	MaxPayloadCount int
 	Rate            int
 	TxSize          int
+	WaitTime        int
 }
 
 // New creates a new variable of type Config from some arguments.
 func New(id int, name string, id2NameMap map[int]string, name2IdMap map[string]int, addr, p2pPort string,
 	priKeyTS *share.PriShare, pubKeyTS *share.PubPoly, id2AddrMap, id2PortMap map[int]string, maxPool, logLevel,
-	timeOut int, networkDelay int, ddos bool, maxPayloadSize, maxPayloadCount, rate, txSize int) *Config {
+	timeOut int, mockLatency int, ddos bool, maxPayloadSize, maxPayloadCount, rate, txSize, waitTime int) *Config {
 	conf := &Config{
 		Id:              id,
 		Name:            name,
@@ -56,12 +57,13 @@ func New(id int, name string, id2NameMap map[int]string, name2IdMap map[string]i
 		MaxPool:         maxPool,
 		LogLevel:        logLevel,
 		Timeout:         timeOut,
-		NetworkDelay:    networkDelay,
+		MockLatency:     mockLatency,
 		DDoS:            ddos,
 		MaxPayloadSize:  maxPayloadSize,
 		MaxPayloadCount: maxPayloadCount,
 		Rate:            rate,
 		TxSize:          txSize,
+		WaitTime:        waitTime,
 	}
 
 	conf.N = len(id2NameMap)
@@ -95,12 +97,13 @@ func LoadConfig(configPrefix, configName string) (*Config, error) {
 	logLevel := viperConfig.GetInt("log_level")
 	maxPool := viperConfig.GetInt("max_pool")
 	timeOut := viperConfig.GetInt("timeout")
-	networkDelay := viperConfig.GetInt("network_delay")
+	mockLatency := viperConfig.GetInt("mock_latency")
 	ddos := viperConfig.GetBool("ddos")
 	maxPayloadSize := viperConfig.GetInt("max_payload_size")
 	maxPayloadCount := viperConfig.GetInt("max_payload_count")
 	rate := viperConfig.GetInt("rate")
 	txSize := viperConfig.GetInt("tx_size")
+	waitTime := viperConfig.GetInt("wait_time")
 
 	idStringNameMap := viperConfig.GetStringMapString("id_name")
 	id2NameMap := make(map[int]string)
@@ -158,5 +161,5 @@ func LoadConfig(configPrefix, configName string) (*Config, error) {
 	}
 
 	return New(id, name, id2NameMap, name2IdMap, addr, p2pPort, tsShareKey, tsPubKey, id2AddrMap, id2P2PPortMap,
-		maxPool, logLevel, timeOut, networkDelay, ddos, maxPayloadSize, maxPayloadCount, rate, txSize), nil
+		maxPool, logLevel, timeOut, mockLatency, ddos, maxPayloadSize, maxPayloadCount, rate, txSize, waitTime), nil
 }
