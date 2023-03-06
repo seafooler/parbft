@@ -60,9 +60,9 @@ class PathMaker:
         return 'results'
 
     @staticmethod
-    def result_file(nodes, rate, tx_size, faults):
+    def result_file(nodes, faults):
         return join(
-            PathMaker.results_path(), f'bench-{nodes}-{rate}-{tx_size}-{faults}.txt'
+            PathMaker.results_path(), f'bench-{nodes}-{faults}.txt'
         )
 
     @staticmethod

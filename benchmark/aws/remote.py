@@ -54,20 +54,20 @@ class Bench:
     def install(self):
         Print.info('Installing golang and cloning the repo...')
         cmd = [
-            'sudo apt-get update',
-            'sudo apt-get -y upgrade',
-            'sudo apt-get -y autoremove',
-
-            # The following dependencies prevent the error: [error: linker `cc` not found].
-            'sudo apt-get -y install build-essential',
-            'sudo apt-get -y install cmake',
-
-            # Install golang
-            'wget https://go.dev/dl/go1.18.linux-amd64.tar.gz',
-            'tar -zxvf go1.18.linux-amd64.tar.gz',
-            'sudo mv go /usr/local',
-            'echo \'export PATH=$PATH:/usr/local/go/bin\' >> ~/.bashrc',
-            'source ~/.bashrc',
+            # 'sudo apt-get update',
+            # 'sudo apt-get -y upgrade',
+            # 'sudo apt-get -y autoremove',
+            #
+            # # The following dependencies prevent the error: [error: linker `cc` not found].
+            # 'sudo apt-get -y install build-essential',
+            # 'sudo apt-get -y install cmake',
+            #
+            # # Install golang
+            # 'wget https://go.dev/dl/go1.18.linux-amd64.tar.gz',
+            # 'tar -zxvf go1.18.linux-amd64.tar.gz',
+            # 'sudo mv go /usr/local',
+            # 'echo \'export PATH=$PATH:/usr/local/go/bin\' >> ~/.bashrc',
+            # 'source ~/.bashrc',
 
             # Clone the repo.
             f'(git clone {self.settings.repo_url} || (cd {self.settings.repo_name} ; git pull))'
@@ -135,7 +135,18 @@ class Bench:
         cmd = CommandMaker.cleanup()
         subprocess.run([cmd], shell=True, stderr=subprocess.DEVNULL)
 
-        cmd = 'cd /vagrant/parbft/config_gen/ && go run main.go'
+        ips_elem = "\nid_ip: \n"
+        for i in range(len(hosts)):
+            ips_elem += ("  " + str(i) + ": " + hosts[i] + "\n")
+
+        subprocess.run(['pwd'], shell=True, stderr=subprocess.DEVNULL)
+
+        with open('/vagrant/parbft/benchmark/config_temp.yaml', 'a') as f:
+            f.write(ips_elem)
+
+        Print.heading(f'hosts: {hosts}')
+
+        cmd = 'go run /vagrant/parbft/config_gen/main.go'
         subprocess.run([cmd], shell=True, stderr=subprocess.DEVNULL)
 
         # Cleanup all nodes.
@@ -242,7 +253,7 @@ class Bench:
                         hosts, bench_parameters
                     )
                     self._logs(hosts, faults).print(PathMaker.result_file(
-                        n, bench_parameters.tx_size, faults
+                        n, faults
                     ))
                 except (subprocess.SubprocessError, GroupException, ParseError) as e:
                     self.kill(hosts=hosts)

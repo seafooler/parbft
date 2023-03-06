@@ -18,7 +18,7 @@ func init() {
 
 func main() {
 	//logger := hclog.New(&hclog.LoggerOptions{
-	//	Name:   "bdt-main",
+	//	Name:   "parbft-main",
 	//	Output: hclog.DefaultOutput,
 	//	Level:  hclog.Level(conf.LogLevel),
 	//})
@@ -60,7 +60,7 @@ func main() {
 	node.LaunchOptimisticPath(newBlock)
 
 	// launch the pessimistic path
-	node.LaunchPessimisticPath(newBlock)
+	//node.LaunchPessimisticPath(newBlock)
 
 	for {
 		time.Sleep(time.Second)
