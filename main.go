@@ -60,9 +60,7 @@ func main() {
 	node.LaunchOptimisticPath(newBlock)
 
 	// launch the pessimistic path
-	//node.LaunchPessimisticPath(newBlock)
-
-	//node.BroadcastPayLoad()
+	node.LaunchPessimisticPath(newBlock)
 
 	for {
 		time.Sleep(time.Second)

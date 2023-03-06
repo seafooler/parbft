@@ -194,7 +194,7 @@ func (n *Node) HandleMsgsLoop() {
 			}
 
 			// launch the pessimistic path
-			//n.LaunchPessimisticPath(newBlock)
+			n.LaunchPessimisticPath(newBlock)
 		}
 	}
 }
