@@ -3,22 +3,42 @@ id_name:
   1: node1
   2: node2
   3: node3
-id_ip:
-  0: 44.212.72.189
-  1: 13.53.235.47
-  2: 35.77.86.53
-  3: 54.252.212.238
+  4: node4
+  5: node5
+  6: node6
+  7: node7
+  8: node8
+  9: node9
+  10: node10
+  11: node11
+  12: node12
+  13: node13
+  14: node14
+  15: node15
 id_p2p_port:
   0: 8000
   1: 8000
   2: 8000
   3: 8000
+  4: 8000
+  5: 8000
+  6: 8000
+  7: 8000
+  8: 8000
+  9: 8000
+  10: 8000
+  11: 8000
+  12: 8000
+  13: 8000
+  14: 8000
+  15: 8000
 log_level: 3
 max_pool: 10
-timeout: 5
-network_delay: 10
+timeout: 1000
+mock_latency: 0
 ddos: false
-max_payload_size: 500000
+max_payload_size: 5000
 max_payload_count: 1000
 rate: 1000
 tx_size: 512
+wait_time: 60
