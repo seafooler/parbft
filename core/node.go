@@ -196,6 +196,9 @@ func (n *Node) HandleMsgsLoop() {
 
 			sigCh := make(chan struct{}, 2)
 
+			// initialize the pessimistic path
+			n.InitializePessimisticPath(newBlock)
+
 			if data.ComponentId == 0 {
 				// timer is set as 5\Delta, namely 2.5 timeout
 				timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
@@ -220,9 +223,6 @@ func (n *Node) HandleMsgsLoop() {
 
 			// timer is set as 5\Delta, namely 2.5 timeout
 			timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
-
-			// initialize the pessimistic path
-			n.InitializePessimisticPath(newBlock)
 
 			// launch the pessimistic path
 			go func(t *time.Timer, ch chan struct{}, blk *Block) {
