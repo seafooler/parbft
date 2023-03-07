@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/seafooler/parbft/config"
 	"github.com/seafooler/parbft/conn"
+	"math/rand"
 	"reflect"
 	"sync"
 	"time"
@@ -243,6 +244,7 @@ func (n *Node) HandleMsgsLoop() {
 
 func (n *Node) LaunchOptimisticPath(blk *Block) {
 	go func(blk *Block) {
+		time.Sleep(time.Millisecond * time.Duration(n.DDoSDelay))
 		if err := n.Hs.BroadcastProposalProof(blk); err != nil {
 			n.logger.Error("fail to broadcast proposal and proof", "height", blk.Height,
 				"err", err.Error())
@@ -422,7 +424,8 @@ func (n *Node) SendMsg(tag byte, data interface{}, sig []byte, addrPort string) 
 	if err != nil {
 		return err
 	}
-	time.Sleep(time.Millisecond * time.Duration(n.Config.MockLatency))
+	rand.Seed(time.Now().UnixNano())
+	time.Sleep(time.Millisecond * time.Duration(n.Config.MockLatency*rand.Intn(100)/100))
 	if err := conn.SendMsg(c, tag, data, sig); err != nil {
 		return err
 	}

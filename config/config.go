@@ -32,6 +32,7 @@ type Config struct {
 	Timeout         int
 	MockLatency     int
 	DDoS            bool
+	DDoSDelay       int
 	MaxPayloadSize  int
 	MaxPayloadCount int
 	Rate            int
@@ -42,7 +43,7 @@ type Config struct {
 // New creates a new variable of type Config from some arguments.
 func New(id int, name string, id2NameMap map[int]string, name2IdMap map[string]int, addr, p2pPort string,
 	priKeyTS *share.PriShare, pubKeyTS *share.PubPoly, id2AddrMap, id2PortMap map[int]string, maxPool, logLevel,
-	timeOut int, mockLatency int, ddos bool, maxPayloadSize, maxPayloadCount, rate, txSize, waitTime int) *Config {
+	timeOut int, mockLatency int, ddos bool, ddosDelay, maxPayloadSize, maxPayloadCount, rate, txSize, waitTime int) *Config {
 	conf := &Config{
 		Id:              id,
 		Name:            name,
@@ -59,6 +60,7 @@ func New(id int, name string, id2NameMap map[int]string, name2IdMap map[string]i
 		Timeout:         timeOut,
 		MockLatency:     mockLatency,
 		DDoS:            ddos,
+		DDoSDelay:       ddosDelay,
 		MaxPayloadSize:  maxPayloadSize,
 		MaxPayloadCount: maxPayloadCount,
 		Rate:            rate,
@@ -99,6 +101,7 @@ func LoadConfig(configPrefix, configName string) (*Config, error) {
 	timeOut := viperConfig.GetInt("timeout")
 	mockLatency := viperConfig.GetInt("mock_latency")
 	ddos := viperConfig.GetBool("ddos")
+	ddosDelay := viperConfig.GetInt("ddos_delay")
 	maxPayloadSize := viperConfig.GetInt("max_payload_size")
 	maxPayloadCount := viperConfig.GetInt("max_payload_count")
 	rate := viperConfig.GetInt("rate")
@@ -161,5 +164,5 @@ func LoadConfig(configPrefix, configName string) (*Config, error) {
 	}
 
 	return New(id, name, id2NameMap, name2IdMap, addr, p2pPort, tsShareKey, tsPubKey, id2AddrMap, id2P2PPortMap,
-		maxPool, logLevel, timeOut, mockLatency, ddos, maxPayloadSize, maxPayloadCount, rate, txSize, waitTime), nil
+		maxPool, logLevel, timeOut, mockLatency, ddos, ddosDelay, maxPayloadSize, maxPayloadCount, rate, txSize, waitTime), nil
 }
