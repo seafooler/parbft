@@ -221,6 +221,9 @@ func (n *Node) HandleMsgsLoop() {
 			// timer is set as 5\Delta, namely 2.5 timeout
 			timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
 
+			// initialize the pessimistic path
+			n.InitializePessimisticPath(newBlock)
+
 			// launch the pessimistic path
 			go func(t *time.Timer, ch chan struct{}, blk *Block) {
 				select {
@@ -229,7 +232,9 @@ func (n *Node) HandleMsgsLoop() {
 					return
 				case <-t.C:
 					n.logger.Debug("pessimistic path is launched", "height", blk.Height)
-					n.LaunchPessimisticPath(blk)
+					//n.LaunchPessimisticPath(blk)
+					n.smvbaMap[blk.Height].RunOneMVBAView(false,
+						[]byte(fmt.Sprintf("%d", blk.Height)), nil, blk.TxNum, -1)
 				}
 			}(timer, sigCh, newBlock)
 		}
@@ -247,25 +252,31 @@ func (n *Node) LaunchOptimisticPath(blk *Block) {
 	}(blk)
 }
 
-func (n *Node) LaunchPessimisticPath(blk *Block) {
+func (n *Node) InitializePessimisticPath(blk *Block) {
 	if _, ok := n.smvbaMap[blk.Height]; !ok {
 		n.smvbaMap[blk.Height] = NewSMVBA(n, blk.Height)
-		n.Lock()
 		if n.abaMap[blk.Height] == nil {
 			n.abaMap[blk.Height] = NewABA(n, blk.Height)
 		}
-		n.Unlock()
 		n.startedSMVBAHeight = blk.Height
 		n.restoreMessages(blk.Height)
-		go func(blk *Block) {
-			// For testing: to let the pessimistic path run slower
-			//time.Sleep(time.Millisecond * 500)
-
-			n.smvbaMap[blk.Height].RunOneMVBAView(false,
-				[]byte(fmt.Sprintf("%d", blk.Height)), nil, blk.TxNum, -1)
-		}(blk)
 	}
 }
+
+//func (n *Node) LaunchPessimisticPath(blk *Block) {
+//	if _, ok := n.smvbaMap[blk.Height]; !ok {
+//		n.Lock()
+//		defer n.Unlock()
+//		n.smvbaMap[blk.Height] = NewSMVBA(n, blk.Height)
+//		if n.abaMap[blk.Height] == nil {
+//			n.abaMap[blk.Height] = NewABA(n, blk.Height)
+//		}
+//		n.startedSMVBAHeight = blk.Height
+//		n.restoreMessages(blk.Height)
+//		n.smvbaMap[blk.Height].RunOneMVBAView(false,
+//			[]byte(fmt.Sprintf("%d", blk.Height)), nil, blk.TxNum, -1)
+//	}
+//}
 
 func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t *time.Timer) {
 	n.logger.Debug("Update the node status", "replica", n.Name, "data", data)
@@ -282,6 +293,11 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 		n.proofedHeight[prevHeight] = data.TxCount
 		n.maxProofedHeight = prevHeight
 
+		// initialize the ABA
+		if n.abaMap[prevHeight] == nil {
+			n.abaMap[prevHeight] = NewABA(n, prevHeight)
+		}
+
 		// call ABA with the optimistic return
 		go func(dat *ReadyData, ch chan struct{}, t *time.Timer) {
 			select {
@@ -290,12 +306,7 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 				return
 			case <-t.C:
 				pH := dat.Height - 1
-				n.Lock()
-				defer n.Unlock()
-				if n.abaMap[pH] == nil {
-					n.abaMap[pH] = NewABA(n, pH)
-					go n.abaMap[pH].inputValue(pH, dat.TxCount, 0)
-				}
+				go n.abaMap[pH].inputValue(pH, dat.TxCount, 0)
 			}
 		}(data, ch, t)
 
