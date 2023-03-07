@@ -169,6 +169,7 @@ func (n *Node) HandleMsgsLoop() {
 					n.logger.Error("Receive a readydata but it is not broadcast by an optimistic path before",
 						"height-2", data.Height-2)
 				} else {
+					n.logger.Info("!!! Receive a readydata", "height-2", data.Height-2)
 					sigCh <- struct{}{}
 				}
 			}
@@ -214,15 +215,16 @@ func (n *Node) HandleMsgsLoop() {
 			timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
 
 			// launch the pessimistic path
-			go func(t *time.Timer, ch chan struct{}) {
+			go func(t *time.Timer, ch chan struct{}, blk *Block) {
 				select {
 				case <-ch:
+					n.logger.Info("!!! Receive a the channel signal", "height", blk.Height)
 					return
 				case <-t.C:
-					n.logger.Info("pessimistic path is launched", "height", newBlock.Height)
-					n.LaunchPessimisticPath(newBlock)
+					n.logger.Info("pessimistic path is launched", "height", blk.Height)
+					n.LaunchPessimisticPath(blk)
 				}
-			}(timer, sigCh)
+			}(timer, sigCh, newBlock)
 		}
 	}
 }
