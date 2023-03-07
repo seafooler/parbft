@@ -167,7 +167,6 @@ func (n *Node) HandleMsgsLoop() {
 			if data.Height >= 2 {
 				if sigCh, ok := n.optPathFinishCh[data.Height-2]; !ok {
 					n.logger.Error("Receive a readydata but it is not broadcast by an optimistic path before")
-					continue
 				} else {
 					sigCh <- struct{}{}
 				}
