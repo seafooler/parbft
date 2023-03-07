@@ -52,7 +52,7 @@ func (h *HS) BroadcastProposalProof(blk *Block) error {
 	if err := h.node.PlainBroadcast(HSProposalMsgTag, proposalMsg, nil); err != nil {
 		return err
 	}
-	h.hLogger.Info("successfully broadcast a new proposal and proof",
+	h.hLogger.Info("successfully broadcast a new proposal and proof", "txNum", proposalMsg.TxNum,
 		"height", blk.Height)
 	return nil
 }

@@ -38,6 +38,8 @@ type Node struct {
 	lastBlockCreatedTime time.Time
 	maxCachedTxs         int
 
+	optPathFinishCh map[int]chan struct{}
+
 	sync.Mutex
 }
 
@@ -53,6 +55,7 @@ func NewNode(conf *config.Config) *Node {
 		committedHeight: -1,
 		proofedHeight:   make(map[int]int),
 		maxCachedTxs:    conf.MaxPayloadCount * (conf.MaxPayloadSize / conf.TxSize),
+		optPathFinishCh: make(map[int]chan struct{}),
 	}
 
 	node.logger = hclog.New(&hclog.LoggerOptions{
@@ -154,10 +157,19 @@ func (n *Node) HandleMsgsLoop() {
 				}
 			case PayLoadMsg:
 				continue
+			case PaceSyncMsg:
+				continue
 			default:
 				n.logger.Error("Unknown type of the received message!")
 			}
 		case data := <-n.readyData:
+
+			if sigCh, ok := n.optPathFinishCh[data.Height-2]; !ok {
+				n.logger.Error("Receive a readydata but it is not broadcast by an optimistic path before")
+				continue
+			} else {
+				sigCh <- struct{}{}
+			}
 
 			curTime := time.Now()
 			estimatdTxNum := int(curTime.Sub(n.lastBlockCreatedTime).Seconds() * float64(n.Config.Rate))
@@ -187,14 +199,27 @@ func (n *Node) HandleMsgsLoop() {
 				}
 			}
 
+			var sigCh chan struct{}
+
 			// continue the optimistic path
 			if newBlock.Height == n.startedHSHeight+1 {
+				n.optPathFinishCh[newBlock.Height] = sigCh
 				n.LaunchOptimisticPath(newBlock)
 				n.startedHSHeight++
 			}
 
+			// timer is set as 5\Delta, namely 2.5 timeout
+			timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
+
 			// launch the pessimistic path
-			n.LaunchPessimisticPath(newBlock)
+			go func(t *time.Timer, ch chan struct{}) {
+				select {
+				case <-ch:
+					return
+				case <-t.C:
+					n.LaunchPessimisticPath(newBlock)
+				}
+			}(timer, sigCh)
 		}
 	}
 }
