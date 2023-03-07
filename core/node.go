@@ -250,7 +250,11 @@ func (n *Node) LaunchOptimisticPath(blk *Block) {
 func (n *Node) LaunchPessimisticPath(blk *Block) {
 	if _, ok := n.smvbaMap[blk.Height]; !ok {
 		n.smvbaMap[blk.Height] = NewSMVBA(n, blk.Height)
-		n.abaMap[blk.Height] = NewABA(n, blk.Height)
+		n.Lock()
+		if n.abaMap[blk.Height] == nil {
+			n.abaMap[blk.Height] = NewABA(n, blk.Height)
+		}
+		n.Unlock()
 		n.startedSMVBAHeight = blk.Height
 		n.restoreMessages(blk.Height)
 		go func(blk *Block) {
@@ -286,6 +290,8 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 				return
 			case <-t.C:
 				pH := dat.Height - 1
+				n.Lock()
+				defer n.Unlock()
 				if n.abaMap[pH] == nil {
 					n.abaMap[pH] = NewABA(n, pH)
 					go n.abaMap[pH].inputValue(pH, dat.TxCount, 0)
