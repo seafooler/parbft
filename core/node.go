@@ -164,9 +164,10 @@ func (n *Node) HandleMsgsLoop() {
 			}
 		case data := <-n.readyData:
 
-			if data.Height >= 2 {
+			if data.ComponentId == 0 && data.Height >= 2 {
 				if sigCh, ok := n.optPathFinishCh[data.Height-2]; !ok {
-					n.logger.Error("Receive a readydata but it is not broadcast by an optimistic path before")
+					n.logger.Error("Receive a readydata but it is not broadcast by an optimistic path before",
+						"height-2", data.Height-2)
 				} else {
 					sigCh <- struct{}{}
 				}
@@ -218,6 +219,7 @@ func (n *Node) HandleMsgsLoop() {
 				case <-ch:
 					return
 				case <-t.C:
+					n.logger.Info("pessimistic path is launched", "height", newBlock.Height)
 					n.LaunchPessimisticPath(newBlock)
 				}
 			}(timer, sigCh)
