@@ -169,8 +169,10 @@ func (n *Node) HandleMsgsLoop() {
 					n.logger.Error("Receive a readydata but it is not broadcast by an optimistic path before",
 						"height-2", data.Height-2)
 				} else {
-					n.logger.Info("!!! Receive a readydata", "height-2", data.Height-2)
+					n.logger.Debug("!!! Receive a readydata", "height-2", data.Height-2)
 					go func(ch chan struct{}) {
+						// two signals
+						ch <- struct{}{}
 						ch <- struct{}{}
 					}(sigCh)
 
@@ -192,9 +194,13 @@ func (n *Node) HandleMsgsLoop() {
 
 			n.lastBlockCreatedTime = curTime
 
+			sigCh := make(chan struct{}, 2)
+
 			if data.ComponentId == 0 {
+				// timer is set as 5\Delta, namely 2.5 timeout
+				timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
 				// update status by the optimistic path
-				n.updateStatusByOptimisticData(&data)
+				n.updateStatusByOptimisticData(&data, sigCh, timer)
 			} else {
 				if data.Height > n.committedHeight {
 					// update status by the pessimistic path
@@ -204,8 +210,6 @@ func (n *Node) HandleMsgsLoop() {
 					n.logger.Info("commit the block from the final ABA", "replica", n.Name, "block_index", data.Height)
 				}
 			}
-
-			sigCh := make(chan struct{})
 
 			// continue the optimistic path
 			if newBlock.Height == n.startedHSHeight+1 {
@@ -221,10 +225,10 @@ func (n *Node) HandleMsgsLoop() {
 			go func(t *time.Timer, ch chan struct{}, blk *Block) {
 				select {
 				case <-ch:
-					n.logger.Info("!!! Receive a channel signal", "height", blk.Height)
+					n.logger.Debug("!!! Receive a channel signal", "height", blk.Height)
 					return
 				case <-t.C:
-					n.logger.Info("pessimistic path is launched", "height", blk.Height)
+					n.logger.Debug("pessimistic path is launched", "height", blk.Height)
 					n.LaunchPessimisticPath(blk)
 				}
 			}(timer, sigCh, newBlock)
@@ -259,7 +263,7 @@ func (n *Node) LaunchPessimisticPath(blk *Block) {
 	}
 }
 
-func (n *Node) updateStatusByOptimisticData(data *ReadyData) {
+func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t *time.Timer) {
 	n.logger.Debug("Update the node status", "replica", n.Name, "data", data)
 	n.Lock()
 	defer n.Unlock()
@@ -275,10 +279,20 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData) {
 		n.maxProofedHeight = prevHeight
 
 		// call ABA with the optimistic return
-		if n.abaMap[prevHeight] == nil {
-			n.abaMap[prevHeight] = NewABA(n, prevHeight)
-			go n.abaMap[prevHeight].inputValue(prevHeight, data.TxCount, 0)
-		}
+		go func(dat *ReadyData, ch chan struct{}, t *time.Timer) {
+			select {
+			case <-ch:
+				n.logger.Debug("!!! Receive a channel signal before launching ABA", "height", dat.Height)
+				return
+			case <-t.C:
+				pH := dat.Height - 1
+				if n.abaMap[pH] == nil {
+					n.abaMap[pH] = NewABA(n, pH)
+					go n.abaMap[pH].inputValue(pH, dat.TxCount, 0)
+				}
+			}
+		}(data, ch, t)
+
 	}
 
 	if prevHeight == n.committedHeight+1 {
