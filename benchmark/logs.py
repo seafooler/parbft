@@ -102,7 +102,7 @@ class LogParser:
 
     def _consensus_throughput(self):
         if not self.commits:
-            return 0, 0, 0
+            return 0, 0
         start, end = min(self.proposals.values()), max(t for t,_ in self.commits.values())
         duration = end - start
         #bytes = sum(self.sizes.values())

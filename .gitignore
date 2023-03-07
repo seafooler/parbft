@@ -5,3 +5,4 @@ parbft
 benchmark/node*.yaml
 .DS_Store
 benchmark/logs
+benchmark/results

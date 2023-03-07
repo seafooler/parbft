@@ -129,7 +129,7 @@ class Bench:
         g = Group(*hosts, user='ubuntu', connect_kwargs=self.connect)
         g.run(' && '.join(cmd), hide=True)
 
-    def _config(self, hosts):
+    def _config(self, hosts, delay):
         Print.info('Generating configuration files...')
         # Cleanup all local configuration files.
         cmd = CommandMaker.cleanup()
@@ -141,8 +141,11 @@ class Bench:
 
         subprocess.run(['pwd'], shell=True, stderr=subprocess.DEVNULL)
 
+        delay_elem = "mock_latency: " + str(delay) + "\n"
+
         with open('/vagrant/parbft/benchmark/config_temp.yaml', 'a') as f:
             f.write(ips_elem)
+            f.write(delay_elem)
 
         Print.heading(f'hosts: {hosts}')
 
@@ -229,13 +232,6 @@ class Bench:
         Print.info(f'{bench_parameters.faults} faults')
 
         hosts = selected_hosts[:bench_parameters.nodes[0]]
-        # Upload all configuration files.
-        try:
-            self._config(hosts)
-            # self._config()
-        except (subprocess.SubprocessError, GroupException) as e:
-            e = FabricError(e) if isinstance(e, GroupException) else e
-            Print.error(BenchError('Failed to configure nodes', e))
 
         # Run benchmarks.
         for n in bench_parameters.nodes:
@@ -246,18 +242,31 @@ class Bench:
             hosts = hosts[:n-faults]
 
             # Run the benchmark.
-            for i in range(bench_parameters.runs):
-                Print.heading(f'Run {i+1}/{bench_parameters.runs}')
+            for d in bench_parameters.mock_latencies:
+                # Upload all configuration files.
                 try:
-                    self._run_single(
-                        hosts, bench_parameters
-                    )
-                    self._logs(hosts, faults).print(PathMaker.result_file(
-                        n, faults
-                    ))
-                except (subprocess.SubprocessError, GroupException, ParseError) as e:
-                    self.kill(hosts=hosts)
-                    if isinstance(e, GroupException):
-                        e = FabricError(e)
-                    Print.error(BenchError('Benchmark failed', e))
-                    continue
+                    self._config(hosts, d)
+                    # self._config()
+                except (subprocess.SubprocessError, GroupException) as e:
+                    e = FabricError(e) if isinstance(e, GroupException) else e
+                    Print.error(BenchError('Failed to configure nodes', e))
+
+                boundary = "------------------- " + str(d) + "ms -------------------"
+                with open('/vagrant/parbft/benchmark/results/bench-16-0.txt', 'a') as f:
+                    f.write(boundary)
+
+                for i in range(bench_parameters.runs):
+                    Print.heading(f'Run {i+1}/{bench_parameters.runs}')
+                    try:
+                        self._run_single(
+                            hosts, bench_parameters
+                        )
+                        self._logs(hosts, faults).print(PathMaker.result_file(
+                            n, faults
+                        ))
+                    except (subprocess.SubprocessError, GroupException, ParseError) as e:
+                        self.kill(hosts=hosts)
+                        if isinstance(e, GroupException):
+                            e = FabricError(e)
+                        Print.error(BenchError('Benchmark failed', e))
+                        continue

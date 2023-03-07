@@ -67,8 +67,9 @@ def remote(ctx):
         'nodes': [16],
         'faults': 0,
         'duration': 100,
-        'runs': 1,
+        'runs': 3,
         'timeout_delay': 5000,
+        'mock_latency': [600,700],
     }
     try:
         Bench(ctx).run(bench_params, debug=False)
