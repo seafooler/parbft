@@ -38,7 +38,7 @@ type Node struct {
 	lastBlockCreatedTime time.Time
 	maxCachedTxs         int
 
-	optPathFinishCh map[int]*chan struct{}
+	optPathFinishCh map[int]chan struct{}
 
 	sync.Mutex
 }
@@ -55,7 +55,7 @@ func NewNode(conf *config.Config) *Node {
 		committedHeight: -1,
 		proofedHeight:   make(map[int]int),
 		maxCachedTxs:    conf.MaxPayloadCount * (conf.MaxPayloadSize / conf.TxSize),
-		optPathFinishCh: make(map[int]*chan struct{}),
+		optPathFinishCh: make(map[int]chan struct{}),
 	}
 
 	node.logger = hclog.New(&hclog.LoggerOptions{
@@ -170,7 +170,10 @@ func (n *Node) HandleMsgsLoop() {
 						"height-2", data.Height-2)
 				} else {
 					n.logger.Info("!!! Receive a readydata", "height-2", data.Height-2)
-					*sigCh <- struct{}{}
+					go func(ch chan struct{}) {
+						ch <- struct{}{}
+					}(sigCh)
+
 				}
 			}
 
@@ -202,11 +205,11 @@ func (n *Node) HandleMsgsLoop() {
 				}
 			}
 
-			var sigCh chan struct{}
+			sigCh := make(chan struct{})
 
 			// continue the optimistic path
 			if newBlock.Height == n.startedHSHeight+1 {
-				n.optPathFinishCh[newBlock.Height] = &sigCh
+				n.optPathFinishCh[newBlock.Height] = sigCh
 				n.LaunchOptimisticPath(newBlock)
 				n.startedHSHeight++
 			}
@@ -215,16 +218,16 @@ func (n *Node) HandleMsgsLoop() {
 			timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
 
 			// launch the pessimistic path
-			go func(t *time.Timer, ch *chan struct{}, blk *Block) {
+			go func(t *time.Timer, ch chan struct{}, blk *Block) {
 				select {
-				case <-*ch:
-					n.logger.Info("!!! Receive a the channel signal", "height", blk.Height)
+				case <-ch:
+					n.logger.Info("!!! Receive a channel signal", "height", blk.Height)
 					return
 				case <-t.C:
 					n.logger.Info("pessimistic path is launched", "height", blk.Height)
 					n.LaunchPessimisticPath(blk)
 				}
-			}(timer, &sigCh, newBlock)
+			}(timer, sigCh, newBlock)
 		}
 	}
 }
