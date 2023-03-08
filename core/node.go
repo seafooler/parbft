@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"github.com/hashicorp/go-hclog"
 	"github.com/seafooler/parbft/config"
 	"github.com/seafooler/parbft/conn"
@@ -222,21 +223,21 @@ func (n *Node) HandleMsgsLoop() {
 			}
 
 			// timer is set as 5\Delta, namely 2.5 timeout
-			//timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
-			//
-			//// launch the pessimistic path
-			//go func(t *time.Timer, ch chan struct{}, blk *Block) {
-			//	select {
-			//	case <-ch:
-			//		n.logger.Debug("!!! Receive a channel signal", "height", blk.Height)
-			//		return
-			//	case <-t.C:
-			//		n.logger.Debug("pessimistic path is launched", "height", blk.Height)
-			//		//n.LaunchPessimisticPath(blk)
-			//		n.smvbaMap[blk.Height].RunOneMVBAView(false,
-			//			[]byte(fmt.Sprintf("%d", blk.Height)), nil, blk.TxNum, -1)
-			//	}
-			//}(timer, sigCh, newBlock)
+			timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
+
+			// launch the pessimistic path
+			go func(t *time.Timer, ch chan struct{}, blk *Block) {
+				select {
+				case <-ch:
+					n.logger.Debug("!!! Receive a channel signal", "height", blk.Height)
+					return
+				case <-t.C:
+					n.logger.Debug("pessimistic path is launched", "height", blk.Height)
+					//n.LaunchPessimisticPath(blk)
+					n.smvbaMap[blk.Height].RunOneMVBAView(false,
+						[]byte(fmt.Sprintf("%d", blk.Height)), nil, blk.TxNum, -1)
+				}
+			}(timer, sigCh, newBlock)
 		}
 	}
 }
@@ -299,17 +300,17 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 			n.abaMap[prevHeight] = NewABA(n, prevHeight)
 		}
 
-		// call ABA with the optimistic return
-		//go func(dat *ReadyData, ch chan struct{}, t *time.Timer) {
-		//	select {
-		//	case <-ch:
-		//		n.logger.Debug("!!! Receive a channel signal before launching ABA", "height", dat.Height)
-		//		return
-		//	case <-t.C:
-		//		pH := dat.Height - 1
-		//		go n.abaMap[pH].inputValue(pH, dat.TxCount, 0)
-		//	}
-		//}(data, ch, t)
+		//call ABA with the optimistic return
+		go func(dat *ReadyData, ch chan struct{}, t *time.Timer) {
+			select {
+			case <-ch:
+				n.logger.Debug("!!! Receive a channel signal before launching ABA", "height", dat.Height)
+				return
+			case <-t.C:
+				pH := dat.Height - 1
+				go n.abaMap[pH].inputValue(pH, dat.TxCount, 0)
+			}
+		}(data, ch, t)
 
 	}
 
