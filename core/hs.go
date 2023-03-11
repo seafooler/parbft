@@ -161,7 +161,9 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 		Height: pm.Height,
 		Voter:  h.node.Id,
 	}
-	leaderAddrPort := h.node.Id2AddrMap[h.LeaderId] + ":" + h.node.Id2PortMap[h.LeaderId]
+
+	// the next leader is (pm.Height+1)%b.node.N
+	leaderAddrPort := h.node.Id2AddrMap[(pm.Height+1)%h.node.N] + ":" + h.node.Id2PortMap[(pm.Height+1)%h.node.N]
 	err = h.node.SendMsg(HSVoteMsgTag, hsVoteMsg, nil, leaderAddrPort)
 	if err != nil {
 		h.hLogger.Error("fail to vote for the block", "block_index", pm.Height)
