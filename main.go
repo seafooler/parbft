@@ -45,14 +45,12 @@ func main() {
 
 	go node.HandleMsgsLoop()
 
-	if node.Id == node.Hs.LeaderId {
-		go func() {
-			node.Hs.ProofReady <- &core.ProofData{
-				Proof:  nil,
-				Height: -1,
-			}
-		}()
-	}
+	go func() {
+		node.Hs.ProofReady <- &core.ProofData{
+			Proof:  nil,
+			Height: -1,
+		}
+	}()
 
 	// launch the optimistic path
 	node.LaunchOptimisticPath(0)
