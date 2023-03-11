@@ -239,6 +239,7 @@ func (h *HS) tryAssembleProof(height int) error {
 		//proof := sign_tools.AssembleIntactTSPartial(shares, h.node.PubKeyTS, blockBytes, h.node.N-h.node.F, h.node.N)
 
 		go func() {
+			h.hLogger.Info("Assemble a proof ready data successfully", "height", height)
 			h.ProofReady <- &ProofData{
 				Proof:  sigs,
 				Height: height,
