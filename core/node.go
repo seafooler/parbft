@@ -308,7 +308,7 @@ func (n *Node) HandleMsgsLoop() {
 					n.logger.Debug("pessimistic path is launched", "height", height)
 					//n.LaunchPessimisticPath(blk)
 					n.Lock()
-					payLoadHashes, cnt := n.createBlock()
+					payLoadHashes, cnt := n.createBlock(false)
 					n.Unlock()
 					n.smvbaMap[height].RunOneMVBAView(false,
 						payLoadHashes, nil, cnt*n.maxNumInPayLoad, -1)
@@ -439,7 +439,7 @@ func (n *Node) tryCommit(height int) error {
 }
 
 // createBlock must be called in a concurrent context
-func (n *Node) createBlock() ([][HASHSIZE]byte, int) {
+func (n *Node) createBlock(opt bool) ([][HASHSIZE]byte, int) {
 	var payLoadHashes [][HASHSIZE]byte
 	payLoadCount := len(n.payLoads)
 	if payLoadCount < n.MaxPayloadCount {
@@ -449,8 +449,14 @@ func (n *Node) createBlock() ([][HASHSIZE]byte, int) {
 	}
 	i := 0
 	for ph, _ := range n.payLoads {
-		if _, ok := n.proposedPayloads[ph]; !ok {
-			payLoadHashes[i] = ph
+		if opt {
+			if _, ok := n.proposedPayloads[ph]; !ok {
+				payLoadHashes[i] = ph
+			}
+		} else {
+			if _, ok := n.committedPayloads[ph]; !ok {
+				payLoadHashes[i] = ph
+			}
 		}
 		i++
 		if i >= len(payLoadHashes) {
