@@ -178,7 +178,7 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 		h.hLogger.Error("fail to vote for the block", "block_index", pm.Height)
 		return err
 	} else {
-		h.hLogger.Debug("successfully vote for the block", "block_index", pm.Height)
+		h.hLogger.Info("successfully vote for the block", "block_index", pm.Height, "addrPort", leaderAddrPort)
 	}
 	return nil
 }
