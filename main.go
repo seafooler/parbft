@@ -61,7 +61,7 @@ func main() {
 	}()
 
 	// launch the optimistic path
-	node.LaunchOptimisticPath(0)
+	//node.LaunchOptimisticPath(0)
 
 	// launch the pessimistic path
 	//node.LaunchPessimisticPath(newBlock)
