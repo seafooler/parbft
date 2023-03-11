@@ -278,13 +278,16 @@ func (n *Node) HandleMsgsLoop() {
 				// update status by the optimistic path
 				n.updateStatusByOptimisticData(&data, sigCh, timer)
 			} else {
-				if data.Height > n.committedHeight {
-					// update status by the pessimistic path
-					n.committedHeight = data.Height
-					// switch to the next leader
-					n.Hs.LeaderId = (n.Hs.LeaderId + 1) % n.Config.N
-					n.logger.Info("commit the block from the final ABA", "replica", n.Name, "block_index", data.Height)
-				}
+				// For debug
+				//if data.Height > n.committedHeight {
+				//	// update status by the pessimistic path
+				//	n.committedHeight = data.Height
+				//	// switch to the next leader
+				//	n.Hs.LeaderId = (n.Hs.LeaderId + 1) % n.Config.N
+				//	n.logger.Info("commit the block from the final ABA", "replica", n.Name, "block_index", data.Height)
+				//}
+				n.logger.Info("receive a result from final ABA but do not commit", "replica", n.Name,
+					"block_index", data.Height)
 			}
 
 			// continue the optimistic path
