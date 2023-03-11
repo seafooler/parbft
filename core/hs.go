@@ -83,7 +83,7 @@ func (h *HS) BroadcastProposalProof(height int) error {
 
 // ProcessHSProposalMsg votes for the current proposal and commits the previous-previous block
 func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
-	h.hLogger.Debug("Process the HS Proposal Message", "block_index", pm.Height)
+	h.hLogger.Info("Process the HS Proposal Message", "block_index", pm.Height)
 	h.Lock()
 	defer h.Unlock()
 	h.cachedHeight[pm.Height] = pm.PayLoadHashes
@@ -192,7 +192,7 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 		h.hLogger.Error("fail to vote for the block", "block_index", pm.Height)
 		return err
 	} else {
-		h.hLogger.Debug("successfully vote for the block", "block_index", pm.Height, "addrPort", leaderAddrPort)
+		h.hLogger.Info("successfully vote for the block", "block_index", pm.Height, "addrPort", leaderAddrPort)
 	}
 	return nil
 }
