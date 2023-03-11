@@ -289,6 +289,11 @@ func (n *Node) HandleMsgsLoop() {
 
 			// continue the optimistic path
 			//if newBlock.Height == n.startedHSHeight+1 {
+			if _, ok := n.optPathFinishCh[data.Height+1]; ok {
+				n.logger.Info("path of next height has been launched", "data.Height+1", data.Height+1)
+				continue
+			}
+
 			n.logger.Debug("optPathFinishCh is set", "data.Height+1", data.Height+1)
 			n.optPathFinishCh[data.Height+1] = sigCh
 			n.LaunchOptimisticPath(data.Height + 1)
