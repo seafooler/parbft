@@ -48,7 +48,7 @@ func main() {
 	go func() {
 		node.Hs.ProofReady <- &core.ProofData{
 			Proof:  nil,
-			Height: 0,
+			Height: -1,
 		}
 	}()
 

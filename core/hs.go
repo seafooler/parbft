@@ -52,6 +52,10 @@ func (h *HS) BroadcastProposalProof(height int) error {
 		return nil
 	}
 
+	if pr.Height != height-1 {
+		h.hLogger.Error("Height of proof is incorrect", "pr.Height", pr.Height, "blk.Height", height)
+	}
+
 	h.node.Lock()
 	payLoadHashes, cnt := h.node.createBlock()
 	h.node.Unlock()
@@ -63,9 +67,6 @@ func (h *HS) BroadcastProposalProof(height int) error {
 		Proposer:      h.node.Id,
 	}
 
-	if pr.Height != blk.Height-1 {
-		h.hLogger.Error("Height of proof is incorrect", "pr.Height", pr.Height, "blk.Height", blk.Height)
-	}
 	proposalMsg := HSProposalMsg{
 		Block: *blk,
 		Proof: pr.Proof,
