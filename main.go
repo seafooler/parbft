@@ -45,12 +45,12 @@ func main() {
 
 	go node.HandleMsgsLoop()
 
-	//go func() {
-	//	node.Hs.ProofReady <- &core.ProofData{
-	//		Proof:  nil,
-	//		Height: -1,
-	//	}
-	//}()
+	go func() {
+		node.Hs.ProofReady <- &core.ProofData{
+			Proof:  nil,
+			Height: 0,
+		}
+	}()
 
 	go func() {
 		node.ReadyData <- core.ReadyData{
