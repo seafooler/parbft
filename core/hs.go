@@ -42,18 +42,19 @@ func (h *HS) BroadcastProposalProof(height int) error {
 	//if h.LeaderId != h.node.Id {
 	//	return nil
 	//}
-	pr := <-h.ProofReady
 
 	// the next leader is (height+1) %n
-	if h.node.Id != (pr.Height+1)%h.node.N {
-		h.hLogger.Info("b.node.Id != (proofReady.Height+1)%b.node.N", "b.node.Id", h.node.Id,
-			"(proofReady.Height+1)%b.node.N", (pr.Height+1)%h.node.N, "proofReady.Height", pr.Height,
-			"b.node.N", h.node.N)
+	if h.node.Id != height%h.node.N {
+		h.hLogger.Info("h.node.Id != height%h.node.N", "h.node.Id", h.node.Id,
+			"height%h.node.N", height%h.node.N, "height", height, "h.node.N", h.node.N)
 		return nil
 	}
 
+	pr := <-h.ProofReady
+
 	if pr.Height != height-1 {
 		h.hLogger.Error("Height of proof is incorrect", "pr.Height", pr.Height, "blk.Height", height)
+		//return errors.New("height of proof is incorrect")
 	}
 
 	h.node.Lock()
@@ -63,7 +64,7 @@ func (h *HS) BroadcastProposalProof(height int) error {
 	blk := &Block{
 		TxNum:         cnt * h.node.maxNumInPayLoad,
 		PayLoadHashes: payLoadHashes,
-		Height:        height,
+		Height:        pr.Height,
 		Proposer:      h.node.Id,
 	}
 
