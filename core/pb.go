@@ -19,8 +19,9 @@ type PB struct {
 
 	pbOutputCh chan SMVBAQCedData
 
-	dataToPB    []byte
+	dataToPB    [][HASHSIZE]byte
 	partialSigs [][]byte
+	dataHash    []byte
 
 	mux sync.RWMutex
 }
@@ -32,7 +33,7 @@ func NewPB(s *SPB, id uint8) *PB {
 	}
 }
 
-func (pb *PB) PBBroadcastData(data, proof []byte, txCount, view int, phase uint8) error {
+func (pb *PB) PBBroadcastData(data [][HASHSIZE]byte, proof []byte, txCount, view int, phase uint8) error {
 	qcdChan := make(chan SMVBAQCedData)
 
 	pb.mux.Lock()
@@ -72,7 +73,13 @@ func (pb *PB) handlePBVALMsg(valMsg *SMVBAPBVALMessage) error {
 	addrPort := pb.spb.s.node.Id2AddrMap[dealerID] + ":" + pb.spb.s.node.Id2PortMap[dealerID]
 
 	// TODO: should sign over the data plus SNView rather than the only data
-	partialSig := sign_tools.SignTSPartial(pb.spb.s.node.PriKeyTS, valMsg.Data)
+	// TODO: simply use the first hash
+	hash, err := genMsgHashSum(valMsg.Data[0][:])
+	pb.dataHash = hash
+	if err != nil {
+		return err
+	}
+	partialSig := sign_tools.SignTSPartial(pb.spb.s.node.PriKeyTS, hash)
 	votMsg := SMVBAPBVOTMessage{
 		Height:         valMsg.Height,
 		TxCount:        valMsg.TxCount,
@@ -80,7 +87,7 @@ func (pb *PB) handlePBVALMsg(valMsg *SMVBAPBVALMessage) error {
 		Dealer:         valMsg.Dealer,
 		Sender:         pb.spb.s.node.Name,
 		SMVBAViewPhase: valMsg.SMVBAViewPhase,
-		Data:           valMsg.Data,
+		Hash:           hash,
 	}
 
 	go pb.spb.s.node.SendMsg(SMVBAPBVoteTag, votMsg, nil, addrPort)
@@ -90,7 +97,7 @@ func (pb *PB) handlePBVALMsg(valMsg *SMVBAPBVALMessage) error {
 func (pb *PB) handlePBVOTMsg(votMsg *SMVBAPBVOTMessage) error {
 	pb.spb.s.node.logger.Debug("HandlePBVOTMsg is called", "replica", pb.spb.s.node.Name,
 		"Height", pb.spb.s.height, "node.view", pb.spb.s.view, "msg.Height", votMsg.Height, "view", votMsg.View,
-		"id", pb.id, "sender", votMsg.Sender, "data", string(votMsg.Data))
+		"id", pb.id, "sender", votMsg.Sender, "hash", string(votMsg.Hash))
 	pb.mux.Lock()
 	defer pb.mux.Unlock()
 
@@ -105,12 +112,12 @@ func (pb *PB) handlePBVOTMsg(votMsg *SMVBAPBVOTMessage) error {
 		partialSigs := pb.partialSigs
 		//fmt.Println("pb.partialSigs:", partialSigs, "votMsg: ", string(votMsg.Data))
 		intactSig := sign_tools.AssembleIntactTSPartial(partialSigs, pb.spb.s.node.PubKeyTS,
-			votMsg.Data, pb.spb.s.node.N-pb.spb.s.node.F, pb.spb.s.node.N)
+			votMsg.Hash, pb.spb.s.node.N-pb.spb.s.node.F, pb.spb.s.node.N)
 
 		qcedData := SMVBAQCedData{
 			Height:         votMsg.Height,
 			TxCount:        votMsg.TxCount,
-			Data:           pb.dataToPB,
+			Hash:           pb.dataHash,
 			QC:             intactSig,
 			SMVBAViewPhase: votMsg.SMVBAViewPhase,
 		}

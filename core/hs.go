@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/hashicorp/go-hclog"
+	"github.com/seafooler/sign_tools"
 	"sync"
 )
 
@@ -14,7 +15,7 @@ type HS struct {
 
 	cachedVoteMsgs       map[int]map[int][]byte
 	cachedBlockProposals map[int]*HSProposalMsg
-	cachedHeight         map[int]bool
+	cachedHeight         map[int][][HASHSIZE]byte
 
 	sync.Mutex
 }
@@ -32,7 +33,7 @@ func NewHS(n *Node, leader int) *HS {
 		ProofReady:           make(chan *ProofData),
 		cachedVoteMsgs:       make(map[int]map[int][]byte),
 		cachedBlockProposals: make(map[int]*HSProposalMsg),
-		cachedHeight:         make(map[int]bool),
+		cachedHeight:         make(map[int][][HASHSIZE]byte),
 	}
 }
 
@@ -62,22 +63,22 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	h.hLogger.Debug("Process the HS Proposal Message", "block_index", pm.Height)
 	h.Lock()
 	defer h.Unlock()
-	h.cachedHeight[pm.Height] = true
+	h.cachedHeight[pm.Height] = pm.PayLoadHashes
 	h.cachedBlockProposals[pm.Height] = pm
 	// do not retrieve the previous block nor verify the proof for the 0th block
 	// try to cache a previous block
-	h.tryCache(pm.Height, pm.Proof)
+	h.tryCache(pm.Height, pm.Proof, pm.PayLoadHashes)
 
 	// if there is already a subsequent block, deal with it
-	if _, ok := h.cachedHeight[pm.Height+1]; ok {
-		h.tryCache(pm.Height+1, h.cachedBlockProposals[pm.Height+1].Proof)
+	if plHashes, ok := h.cachedHeight[pm.Height+1]; ok {
+		h.tryCache(pm.Height+1, h.cachedBlockProposals[pm.Height+1].Proof, plHashes)
 	}
 
 	go func() {
 		h.node.readyData <- ReadyData{
-			ComponentId: 0,
-			TxCount:     pm.TxNum,
-			Height:      pm.Height,
+			ComponentId:   0,
+			PayLoadHashes: pm.PayLoadHashes,
+			Height:        pm.Height,
 		}
 	}()
 
@@ -94,7 +95,7 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 }
 
 // tryCache must be wrapped in a lock
-func (h *HS) tryCache(height int, proof []byte) error {
+func (h *HS) tryCache(height int, proof map[int][]byte, plHashes [][HASHSIZE]byte) error {
 	// retrieve the previous block
 	pBlk, ok := h.cachedBlockProposals[height-1]
 	if !ok {
@@ -104,13 +105,26 @@ func (h *HS) tryCache(height int, proof []byte) error {
 		return nil
 	}
 
-	//// verify the proof
-	//blockBytes, err := encode(pBlk.Block)
-	//if err != nil {
-	//	h.hLogger.Error("fail to encode the block", "block_index", height)
-	//	return err
-	//}
-	//
+	// verify the proof
+	blockBytes, err := encode(pBlk.Block)
+	if err != nil {
+		h.hLogger.Error("fail to encode the block", "block_index", height)
+		return err
+	}
+
+	if len(proof) < h.node.N-h.node.F {
+		h.hLogger.Error("the number of signatures in the proof is not enough", "needed", h.node.N-h.node.F,
+			"len(proof)", len(proof))
+		return nil
+	}
+
+	for i, sig := range proof {
+		if _, err := sign_tools.VerifySignEd25519(h.node.PubKeyED[i], blockBytes, sig); err != nil {
+			h.hLogger.Error("fail to verify proof of a previous block", "prev_block_index", pBlk.Height)
+			return err
+		}
+	}
+
 	//if _, err := sign_tools.VerifyTS(h.node.PubKeyTS, blockBytes, proof); err != nil {
 	//	h.hLogger.Error("fail to verify proof of a previous block", "prev_block_index", pBlk.Height)
 	//	return err
@@ -118,9 +132,15 @@ func (h *HS) tryCache(height int, proof []byte) error {
 
 	delete(h.cachedHeight, pBlk.Height)
 
+	h.node.Lock()
+	for _, hx := range plHashes {
+		h.node.proposedPayloads[hx] = true
+	}
+	h.node.Unlock()
+
 	// if there is already a subsequent block, deal with it
-	if _, ok := h.cachedHeight[height+1]; ok {
-		h.tryCache(height+1, h.cachedBlockProposals[height+1].Proof)
+	if hashes, ok := h.cachedHeight[height+1]; ok {
+		h.tryCache(height+1, h.cachedBlockProposals[height+1].Proof, hashes)
 	}
 
 	return nil
@@ -128,22 +148,21 @@ func (h *HS) tryCache(height int, proof []byte) error {
 
 // send vote to the leader
 func (h *HS) sendVote(pm *HSProposalMsg) error {
-	// create the ts share of new block
-	//blockBytes, err := encode(pm.Block)
-	//if err != nil {
-	//	h.hLogger.Error("fail to encode the block", "block_index", pm.Height)
-	//	return err
-	//}
-	//share := sign_tools.SignTSPartial(h.node.PriKeyTS, blockBytes)
+	// create the normal signature of new block
+	blockBytes, err := encode(pm.Block)
+	if err != nil {
+		h.hLogger.Error("fail to encode the block", "block_index", pm.Height)
+		return err
+	}
 
-	// send the ts share to the leader
+	sig := sign_tools.SignEd25519(h.node.Config.PriKeyED, blockBytes)
 	hsVoteMsg := HSVoteMsg{
-		Share:  nil,
+		EDSig:  sig,
 		Height: pm.Height,
 		Voter:  h.node.Id,
 	}
 	leaderAddrPort := h.node.Id2AddrMap[h.LeaderId] + ":" + h.node.Id2PortMap[h.LeaderId]
-	err := h.node.SendMsg(HSVoteMsgTag, hsVoteMsg, nil, leaderAddrPort)
+	err = h.node.SendMsg(HSVoteMsgTag, hsVoteMsg, nil, leaderAddrPort)
 	if err != nil {
 		h.hLogger.Error("fail to vote for the block", "block_index", pm.Height)
 		return err
@@ -161,7 +180,7 @@ func (h *HS) ProcessHSVoteMsg(vm *HSVoteMsg) error {
 	if _, ok := h.cachedVoteMsgs[vm.Height]; !ok {
 		h.cachedVoteMsgs[vm.Height] = make(map[int][]byte)
 	}
-	h.cachedVoteMsgs[vm.Height][vm.Voter] = vm.Share
+	h.cachedVoteMsgs[vm.Height][vm.Voter] = vm.EDSig
 	return h.tryAssembleProof(vm.Height)
 }
 
@@ -169,11 +188,14 @@ func (h *HS) ProcessHSVoteMsg(vm *HSVoteMsg) error {
 // tryAssembleProof may be called by ProcessHsVoteMsg() or ProcessHsProposalMsg()
 func (h *HS) tryAssembleProof(height int) error {
 	if len(h.cachedVoteMsgs[height]) == h.node.N-h.node.F {
-		shares := make([][]byte, h.node.N-h.node.F)
-		i := 0
-		for _, share := range h.cachedVoteMsgs[height] {
-			shares[i] = share
-			i++
+		sigs := make(map[int][]byte)
+		cnt := 0
+		for i, sig := range h.cachedVoteMsgs[height] {
+			sigs[i] = sig
+			cnt++
+			if cnt >= h.node.N-h.node.F {
+				break
+			}
 		}
 
 		//cBlk, ok := h.cachedBlockProposals[height]
@@ -193,7 +215,7 @@ func (h *HS) tryAssembleProof(height int) error {
 
 		go func() {
 			h.ProofReady <- &ProofData{
-				Proof:  nil,
+				Proof:  sigs,
 				Height: height,
 			}
 		}()

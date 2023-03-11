@@ -25,7 +25,7 @@ func NewSPB(s *SMVBA) *SPB {
 
 }
 
-func (spb *SPB) SPBBroadcastData(rawData, proof []byte, txCount, view int) (chan SMVBAQCedData, error) {
+func (spb *SPB) SPBBroadcastData(rawData [][HASHSIZE]byte, proof []byte, txCount, view int) (chan SMVBAQCedData, error) {
 	// Invoke the 1st PB
 	if err := spb.pb1.PBBroadcastData(rawData, proof, txCount, view, 1); err != nil {
 		return nil, err

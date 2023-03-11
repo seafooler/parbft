@@ -7,6 +7,7 @@ require (
 	github.com/hashicorp/go-msgpack v1.1.5
 	github.com/seafooler/sign_tools v0.0.0-20230102164452-07f1c49cf416
 	github.com/spf13/viper v1.3.2
+	github.com/valyala/gorpc v0.0.0-20160519171614-908281bef774
 	go.dedis.ch/kyber/v3 v3.1.0
 )
 

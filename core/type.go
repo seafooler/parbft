@@ -20,6 +20,8 @@ const (
 	PayLoadMsgTag
 )
 
+const HASHSIZE = 32
+
 var msgTagNameMap = map[uint8]string{
 	SMVBAPBValTag:     "VAL",
 	SMVBAPBVoteTag:    "PBV",
@@ -30,63 +32,65 @@ var msgTagNameMap = map[uint8]string{
 }
 
 type Block struct {
-	TxNum    int
-	Reqs     []byte
-	Height   int
-	Proposer int
+	TxNum         int
+	PayLoadHashes [][HASHSIZE]byte
+	Height        int
+	Proposer      int
 }
 
 type PayLoadMsg struct {
-	Reqs [][]byte
+	Hash   [HASHSIZE]byte
+	Reqs   [][]byte
+	Sender string
 }
 
 type HSProposalMsg struct {
 	Block
-	Proof []byte
+	Proof map[int][]byte
 }
 
 type ProofData struct {
-	Proof  []byte
+	Proof  map[int][]byte
 	Height int
 }
 
 type HSVoteMsg struct {
-	Share  []byte
+	EDSig  []byte
 	Height int
 	Voter  int
 }
 
 type ReadyData struct {
-	ComponentId uint8 // 0 represents data being sent from the optimistic path, while 1 represents one from ABA
-	TxCount     int
-	Height      int
+	ComponentId   uint8 // 0 represents data being sent from the optimistic path, while 1 represents one from ABA
+	PayLoadHashes [][HASHSIZE]byte
+	Height        int
 }
 
 // ABABvalRequestMsg holds the input value of the binary input.
 type ABABvalRequestMsg struct {
-	Height  int
-	Sender  int
-	TxCount int
-	Round   uint32
-	BValue  uint8
+	Height        int
+	Sender        int
+	PayLoadHashes [][HASHSIZE]byte
+	Round         uint32
+	BValue        uint8
 }
 
 // ABAAuxRequestMsg holds the output value.
 type ABAAuxRequestMsg struct {
-	Height  int
-	TxCount int
-	Sender  int
-	Round   uint32
-	BValue  uint8
-	TSPar   []byte
+	Height        int
+	PayLoadHashes [][HASHSIZE]byte
+	Sender        int
+	Round         uint32
+	BValue        uint8
+	TSPar         []byte
 }
 
 // ABAExitMsg indicates that a replica has decided
 type ABAExitMsg struct {
-	Height  int
-	Sender  int
-	TxCount int
-	Value   int
+	Height        int
+	Sender        int
+	PayLoadHashes [][HASHSIZE]byte
+	Value         int
 }
 
 // PaceSyncMsg
@@ -105,7 +109,7 @@ type SMVBAViewPhase struct {
 type SMVBAPBVALMessage struct {
 	Height  int
 	TxCount int
-	Data    []byte
+	Data    [][HASHSIZE]byte
 	Proof   []byte
 	Dealer  string // dealer and sender are the same
 	SMVBAViewPhase
@@ -114,7 +118,7 @@ type SMVBAPBVALMessage struct {
 type SMVBAPBVOTMessage struct {
 	Height     int
 	TxCount    int
-	Data       []byte
+	Hash       []byte
 	PartialSig []byte
 	Dealer     string
 	Sender     string
@@ -124,14 +128,14 @@ type SMVBAPBVOTMessage struct {
 type SMVBAQCedData struct {
 	Height  int
 	TxCount int
-	Data    []byte
+	Hash    []byte
 	QC      []byte
 	SMVBAViewPhase
 }
 
 type SMVBAFinishMessage struct {
 	Height  int
-	Data    []byte
+	Hash    []byte
 	QC      []byte
 	Dealer  string
 	TxCount int
@@ -152,7 +156,7 @@ type SMVBAPreVoteMessage struct {
 	TxCount           int
 	Flag              bool
 	Dealer            string
-	Value             []byte
+	Hash              []byte
 	ProofOrPartialSig []byte // lock proof (sigma_1) or rho_{pn}
 	Sender            string
 
@@ -165,7 +169,7 @@ type SMVBAVoteMessage struct {
 	TxCount int
 	Flag    bool
 	Dealer  string
-	Value   []byte
+	Hash    []byte
 	Proof   []byte // sigma_1 or sigma_{PN}
 	Pho     []byte // pho_{2,i} or pho_{vn, i}
 
@@ -177,7 +181,7 @@ type SMVBAVoteMessage struct {
 type SMVBAHaltMessage struct {
 	Height  int
 	TxCount int
-	Value   []byte
+	Hash    []byte
 	Proof   []byte
 	Dealer  string
 	View    int
@@ -187,7 +191,7 @@ type SMVBAReadyViewData struct {
 	Height      int
 	txCount     int
 	usePrevData bool // indicate if using the previous data
-	data        []byte
+	data        [][HASHSIZE]byte
 	proof       []byte
 }
 

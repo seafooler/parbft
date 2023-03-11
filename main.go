@@ -28,12 +28,16 @@ func main() {
 		panic(err)
 	}
 
+	go node.StartListenRPC()
+
 	// wait for each node to start
 	time.Sleep(time.Second * time.Duration(conf.WaitTime))
 
 	if err = node.EstablishP2PConns(); err != nil {
 		panic(err)
 	}
+
+	node.EstablishRPCConns()
 
 	// Help all the replicas to start simultaneously
 	node.BroadcastSyncLaunchMsgs()
@@ -42,9 +46,9 @@ func main() {
 	go node.HandleMsgsLoop()
 
 	newBlock := &core.Block{
-		Reqs:     nil,
-		Height:   0,
-		Proposer: node.Id,
+		PayLoadHashes: nil,
+		Height:        0,
+		Proposer:      node.Id,
 	}
 
 	if node.Id == node.Hs.LeaderId {
@@ -63,6 +67,6 @@ func main() {
 	//node.LaunchPessimisticPath(newBlock)
 
 	for {
-		time.Sleep(time.Second)
+		node.BroadcastPayLoadLoop()
 	}
 }

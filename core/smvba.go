@@ -21,8 +21,9 @@ type SMVBA struct {
 
 	logger hclog.Logger
 
-	inProcessData, inProcessProof []byte
-	inProcessTxNum                int
+	inProcessProof []byte
+	inProcessData  [][HASHSIZE]byte
+	inProcessTxNum int
 
 	finishMessagesMap map[int]map[string]*SMVBAFinishMessage
 	lockMessageMap    map[int]map[string]*SMVBAPBVALMessage
@@ -46,6 +47,8 @@ type SMVBA struct {
 	voteMessageMap    map[int]map[string]*SMVBAVoteMessage
 
 	readyViewDataMap map[int]*SMVBAReadyViewData
+
+	payLoadHashesMap map[string][][HASHSIZE]byte
 }
 
 func NewSMVBA(n *Node, height int) *SMVBA {
@@ -67,6 +70,7 @@ func NewSMVBA(n *Node, height int) *SMVBA {
 		readyViewDataMap:  make(map[int]*SMVBAReadyViewData),
 		outputCh:          make(chan int),
 		stopCh:            make(chan int),
+		payLoadHashesMap:  make(map[string][][HASHSIZE]byte),
 
 		coin: make(map[int]int),
 	}
@@ -93,7 +97,7 @@ func (s *SMVBA) Output() []byte {
 }
 
 // BroadcastViaSPB encapsulates the inner functions of calling SPB
-func (s *SMVBA) BroadcastViaSPB(data, proof []byte, txCount, view int) (chan SMVBAQCedData, error) {
+func (s *SMVBA) BroadcastViaSPB(data [][HASHSIZE]byte, proof []byte, txCount, view int) (chan SMVBAQCedData, error) {
 	return s.spb.SPBBroadcastData(data, proof, txCount, view)
 }
 
@@ -123,8 +127,8 @@ func (s *SMVBA) HandleFinishMsg(fMsg *SMVBAFinishMessage) {
 	}
 
 	// doneShareMessage's Height&View is assigned based on fMsg's Height&View, so no mutex is needed here
-	coinShare := sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v",
-		msgTagNameMap[SMVBADoneShareTag], fMsg.View)))
+	coinShare := sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v%v",
+		msgTagNameMap[SMVBADoneShareTag], fMsg.Height, fMsg.View)))
 	doneShareMsg := SMVBADoneShareMessage{
 		Height:  fMsg.Height,
 		TSShare: coinShare,
@@ -162,7 +166,7 @@ func (s *SMVBA) HandleFinishMsg(fMsg *SMVBAFinishMessage) {
 	}
 }
 
-func (s *SMVBA) RunOneMVBAView(usePrevData bool, data, proof []byte, txCount, v int) error {
+func (s *SMVBA) RunOneMVBAView(usePrevData bool, data [][HASHSIZE]byte, proof []byte, txCount, v int) error {
 	s.logger.Debug("RunOneMVBAView is called", "replica", s.node.Name, "Height", s.height, "view", v)
 	s.Lock()
 
@@ -214,7 +218,7 @@ func (s *SMVBA) RunOneMVBAView(usePrevData bool, data, proof []byte, txCount, v 
 
 	// Phase 1: SPB phase
 	s.logger.Debug("Run a new view by calling the SPB", "replica", s.node.Name, "s.Height", s.height,
-		"view", s.view, "data", string(s.inProcessData), "usePrevData", usePrevData)
+		"view", s.view, "data", s.inProcessData, "usePrevData", usePrevData)
 	qcedDataCh, err := s.BroadcastViaSPB(s.inProcessData, s.inProcessProof, s.inProcessTxNum, s.view)
 	if err != nil {
 		return err
@@ -240,14 +244,14 @@ func (s *SMVBA) RunOneMVBAView(usePrevData bool, data, proof []byte, txCount, v 
 	finishMsg := SMVBAFinishMessage{
 		Height:  qcedData.Height,
 		TxCount: qcedData.TxCount,
-		Data:    qcedData.Data,
+		Hash:    qcedData.Hash,
 		QC:      qcedData.QC,
 		Dealer:  s.node.Name,
 		View:    s.view,
 	}
 
 	s.logger.Debug("finishMsg's Data", "replica", s.node.Name,
-		"finishMsg.Data", string(finishMsg.Data))
+		"finishMsg.Hash", string(finishMsg.Hash))
 
 	if err := s.node.PlainBroadcast(SMVBAFinishTag, finishMsg, nil); err != nil {
 		return err
@@ -273,8 +277,8 @@ func (s *SMVBA) HandleDoneShareMsg(msg *SMVBADoneShareMessage) {
 		return
 	}
 
-	coinShare := sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v",
-		msgTagNameMap[SMVBADoneShareTag], msg.View)))
+	coinShare := sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v%v",
+		msgTagNameMap[SMVBADoneShareTag], msg.Height, msg.View)))
 	doneShareMsg := SMVBADoneShareMessage{
 		Height:  msg.Height,
 		TSShare: coinShare,
@@ -313,7 +317,7 @@ func (s *SMVBA) HandleDoneShareMsg(msg *SMVBADoneShareMessage) {
 			break
 		}
 	}
-	data := []byte(fmt.Sprintf("%s%v", msgTagNameMap[SMVBADoneShareTag], msg.View))
+	data := []byte(fmt.Sprintf("%s%v%v", msgTagNameMap[SMVBADoneShareTag], msg.Height, msg.View))
 	intactTS := sign_tools.AssembleIntactTSPartial(partialSigs, s.node.PubKeyTS, data, 2*s.node.F+1, s.node.N)
 	coin := binary.BigEndian.Uint64(intactTS) % uint64(s.node.N)
 
@@ -349,23 +353,29 @@ func (s *SMVBA) HaltOrPreVote(h, v, txCount int, coinNode string) {
 	finishMsgByCoin := s.finishMessagesMap[v][coinNode]
 	if finishMsgByCoin != nil && s.output == nil {
 		// If true, output it
-		s.output = finishMsgByCoin.Data
+		s.output = finishMsgByCoin.Hash
 		s.logger.Debug("Data is output after consensus", "replica", s.node.Name, "s.Height", s.height, "View", v,
 			"dealer", finishMsgByCoin.Dealer, "data", string(s.output))
 		// broadcast halt messages
 		hm := SMVBAHaltMessage{
 			Height:  h,
 			TxCount: txCount,
-			Value:   finishMsgByCoin.Data,
+			Hash:    finishMsgByCoin.Hash,
 			Proof:   finishMsgByCoin.QC,
 			View:    v,
 			Dealer:  finishMsgByCoin.Dealer,
 		}
 
 		go s.node.PlainBroadcast(SMVBAHaltTag, hm, nil)
+
+		payLoadHashes, ok := s.payLoadHashesMap[coinNode]
+		if !ok {
+			s.logger.Error("payLoadHashes has not received by the node")
+		}
+
 		s.logger.Info("Return from SMVBA", "replica", s.node.Name, "Height", h, "View", v,
 			"dealer", finishMsgByCoin.Dealer, "data", string(s.output))
-		go s.node.abaMap[hm.Height].inputValue(hm.Height, txCount, 1)
+		go s.node.abaMap[hm.Height].inputValue(hm.Height, payLoadHashes, 1)
 
 		// send a signal to suspend this round of MVBA or receiving a signal that MVBA has been suspended
 		s.logger.Debug("Before sending a signal to outputCh or receiving a signal from stopCh in HaltOrPreVote",
@@ -388,6 +398,24 @@ func (s *SMVBA) HaltOrPreVote(h, v, txCount int, coinNode string) {
 	}
 }
 
+func (s *SMVBA) updatePayloads(payLoadHashes [][HASHSIZE]byte) int {
+	committedCount := 0
+	s.node.Lock()
+	for _, plHash := range payLoadHashes {
+		if _, ok := s.node.payLoads[plHash]; ok {
+			delete(s.node.payLoads, plHash)
+			committedCount++
+		} else {
+			if _, existed := s.node.committedPayloads[plHash]; !existed {
+				s.node.committedPayloads[plHash] = true
+				committedCount++
+			}
+		}
+	}
+	s.node.Unlock()
+	return committedCount
+}
+
 func (s *SMVBA) BroadcastPreVote(h, v, txCount int) error {
 	s.logger.Debug("BroadcastPreVote is called", "replica", s.node.Name,
 		"s.Height", s.height, "View", v)
@@ -405,13 +433,13 @@ func (s *SMVBA) BroadcastPreVote(h, v, txCount int) error {
 	if ok {
 		// lock data exists
 		pvm.Flag = true
-		pvm.Value = lockData.Data
+		pvm.TxCount = lockData.TxCount
 		pvm.ProofOrPartialSig = lockData.Proof
 	} else {
 		pvm.Flag = false
-		pvm.Value = nil
-		pvm.ProofOrPartialSig = sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v",
-			msgTagNameMap[SMVBAPreVoteTag], v)))
+		pvm.Hash = nil
+		pvm.ProofOrPartialSig = sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v%v",
+			msgTagNameMap[SMVBAPreVoteTag], h, v)))
 	}
 
 	go s.node.PlainBroadcast(SMVBAPreVoteTag, pvm, nil)
@@ -441,10 +469,10 @@ func (s *SMVBA) HandlePreVoteMsg(pvm *SMVBAPreVoteMessage) {
 	if pvm.Flag {
 		// TODO: check the proof of PVM
 		vm.Flag = true
-		vm.Value = pvm.Value
+		vm.Hash = pvm.Hash
 		vm.Proof = pvm.ProofOrPartialSig
-		vm.Pho = sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v%T",
-			msgTagNameMap[SMVBAVoteTag], pvm.View, true)))
+		vm.Pho = sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v%v%T",
+			msgTagNameMap[SMVBAVoteTag], pvm.Height, pvm.View, true)))
 
 		s.Lock()
 
@@ -467,7 +495,7 @@ func (s *SMVBA) HandlePreVoteMsg(pvm *SMVBAPreVoteMessage) {
 	if len(s.preVoteMessageMap[pvm.View]) == 2*s.node.F+1 && !s.voteSent[pvm.View] {
 		s.voteSent[pvm.View] = true
 		vm.Flag = false
-		vm.Value = nil
+		vm.Hash = nil
 		partialSigs := make([][]byte, 2*s.node.F+1)
 		count := 0
 		for _, msg := range s.preVoteMessageMap[pvm.View] {
@@ -477,12 +505,12 @@ func (s *SMVBA) HandlePreVoteMsg(pvm *SMVBAPreVoteMessage) {
 				break
 			}
 		}
-		data := []byte(fmt.Sprintf("%s%v", msgTagNameMap[SMVBAPreVoteTag], pvm.View))
+		data := []byte(fmt.Sprintf("%s%v%v", msgTagNameMap[SMVBAPreVoteTag], pvm.Height, pvm.View))
 		intactTS := sign_tools.AssembleIntactTSPartial(partialSigs, s.node.PubKeyTS,
 			data, s.node.N-s.node.F, s.node.N)
 		vm.Proof = intactTS
-		vm.Pho = sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v%T",
-			msgTagNameMap[SMVBAVoteTag], pvm.View, false)))
+		vm.Pho = sign_tools.SignTSPartial(s.node.PriKeyTS, []byte(fmt.Sprintf("%s%v%v%T",
+			msgTagNameMap[SMVBAVoteTag], pvm.Height, pvm.View, false)))
 		go s.node.PlainBroadcast(SMVBAVoteTag, vm, nil)
 	}
 }
@@ -530,11 +558,11 @@ func (s *SMVBA) HandleVoteMsg(vm *SMVBAVoteMessage) {
 		// 2f+1 true votes
 		if trueCount == 2*s.node.F+1 && s.output == nil {
 			// decide and output it
-			s.output = vm.Value
+			s.output = vm.Hash
 			s.logger.Debug("Data is output after consensus", "replica", s.node.Name, "Height", vm.Height, "view", vm.View,
 				"dealer", vm.Dealer, "data", string(s.output))
 
-			data := []byte(fmt.Sprintf("%s%v%T", msgTagNameMap[SMVBAVoteTag], vm.View, true))
+			data := []byte(fmt.Sprintf("%s%v%v%T", msgTagNameMap[SMVBAVoteTag], vm.Height, vm.View, true))
 			intactTS := sign_tools.AssembleIntactTSPartial(partialSigsTrue, s.node.PubKeyTS,
 				data, s.node.N-s.node.F, s.node.N)
 
@@ -542,16 +570,22 @@ func (s *SMVBA) HandleVoteMsg(vm *SMVBAVoteMessage) {
 			hm := SMVBAHaltMessage{
 				Height:  vm.Height,
 				TxCount: vm.TxCount,
-				Value:   vm.Value,
+				Hash:    vm.Hash,
 				Proof:   intactTS,
 				View:    vm.View,
 				Dealer:  vm.Dealer,
 			}
 
 			go s.node.PlainBroadcast(SMVBAHaltTag, hm, nil)
+
+			payLoadHashes, ok := s.payLoadHashesMap[vm.Dealer]
+			if !ok {
+				s.logger.Error("payLoadHashes has not received by the node")
+			}
+
 			s.logger.Info("Return from SMVBA", "replica", s.node.Name, "s.Height", s.height,
 				"msg.View", vm.View, "dealer", vm.Dealer, "data", string(s.output))
-			go s.node.abaMap[hm.Height].inputValue(hm.Height, vm.TxCount, 1)
+			go s.node.abaMap[hm.Height].inputValue(hm.Height, payLoadHashes, 1)
 
 			// send a signal to suspend this round of MVBA
 			s.logger.Debug("Before sending a signal to outputCh or receiving a signal from stopCh in HandleVoteMsg",
@@ -568,11 +602,12 @@ func (s *SMVBA) HandleVoteMsg(vm *SMVBAVoteMessage) {
 			return
 		}
 
-		var dataForNewView, proofForNewView []byte
+		var proofForNewView []byte
+		var dataForNewView [][HASHSIZE]byte
 		var txCountForNewView int
 		if falseCount == 2*s.node.F+1 {
 			// 2f+1 false votes
-			data := []byte(fmt.Sprintf("%s%v%T", msgTagNameMap[SMVBAVoteTag], vm.View, false))
+			data := []byte(fmt.Sprintf("%s%v%v%T", msgTagNameMap[SMVBAVoteTag], vm.Height, vm.View, false))
 			intactTS := sign_tools.AssembleIntactTSPartial(partialSigsFalse, s.node.PubKeyTS,
 				data, s.node.N-s.node.F, s.node.N)
 			usePrevData = true
@@ -580,7 +615,7 @@ func (s *SMVBA) HandleVoteMsg(vm *SMVBAVoteMessage) {
 			// TODO: proofForNewView is different from the paper description
 			proofForNewView = intactTS
 		} else {
-			dataForNewView = someVoteMsgTrue.Value
+			dataForNewView = s.payLoadHashesMap[someVoteMsgTrue.Dealer]
 			proofForNewView = someVoteMsgTrue.Proof
 			txCountForNewView = someVoteMsgTrue.TxCount
 		}
@@ -601,13 +636,19 @@ func (s *SMVBA) HandleHaltMsg(hm *SMVBAHaltMessage) {
 	//TODO: check the proof in HaltMessage
 
 	if s.output == nil {
-		s.output = hm.Value
+		s.output = hm.Hash
 		s.logger.Debug("Data is output after consensus by receiving a halt message ", "replica", s.node.Name,
 			"Height", hm.Height, "node-view", s.view, "dealer", hm.Dealer, "data", string(s.output))
 		go s.node.PlainBroadcast(SMVBAHaltTag, *hm, nil)
+
+		payLoadHashes, ok := s.payLoadHashesMap[hm.Dealer]
+		if !ok {
+			s.logger.Error("payLoadHashes has not received by the node")
+		}
+
 		s.logger.Info("Return from SMVBA", "replica", s.node.Name, "s.Height", s.height, "View", s.view,
 			"dealer", hm.Dealer, "data", string(s.output))
-		go s.node.abaMap[hm.Height].inputValue(hm.Height, hm.TxCount, 1)
+		go s.node.abaMap[hm.Height].inputValue(hm.Height, payLoadHashes, 1)
 
 		// send a signal to suspend this round of MVBA
 		s.logger.Debug("Before sending a signal to outputCh or receiving a signal from stopCh in HandleHaltMsg",

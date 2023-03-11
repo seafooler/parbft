@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
 	"github.com/seafooler/sign_tools"
@@ -63,6 +64,24 @@ func main() {
 		}
 	}
 
+	// Deal with id_p2p_port as a string map
+	idP2PPortPayloadMapInterface := viperRead.GetStringMap("id_p2p_port_payload")
+	if nodeNumber != len(idP2PPortPayloadMapInterface) {
+		panic("id_p2p_port does not match with id_name")
+	}
+	idP2PPortPayloadMap := make(map[int]int, nodeNumber)
+	for idAsString, portAsInterface := range idP2PPortPayloadMapInterface {
+		id, err := strconv.Atoi(idAsString)
+		if err != nil {
+			panic(err)
+		}
+		if port, ok := portAsInterface.(int); ok {
+			idP2PPortPayloadMap[id] = port
+		} else {
+			panic("id_p2p_port in the config file cannot be decoded correctly")
+		}
+	}
+
 	// Deal with id_ips as a string map
 	idIPMapInterface := viperRead.GetStringMap("id_ip")
 	if nodeNumber != len(idIPMapInterface) {
@@ -88,13 +107,22 @@ func main() {
 	logLevel := viperRead.GetInt("log_level")
 	maxPool := viperRead.GetInt("max_pool")
 	timeOut := viperRead.GetInt("timeout")
-	mock_latency := viperRead.GetInt("mock_latency")
+	mockLatency := viperRead.GetInt("mock_latency")
 	ddos := viperRead.GetBool("ddos")
+	ddosDelay := viperRead.GetInt("ddos_delay")
 	max_payload_size := viperRead.GetInt("max_payload_size")
 	max_payload_count := viperRead.GetInt("max_payload_count")
-	rate := viperRead.GetInt("rate")
 	tx_size := viperRead.GetInt("tx_size")
+	rate := viperRead.GetInt("rate")
 	wait_time := viperRead.GetInt("wait_time")
+
+	sks := make([]ed25519.PrivateKey, nodeNumber)
+	pksMap := make(map[int]string)
+	for i := 0; i < nodeNumber; i++ {
+		sk, pk := sign_tools.GenED25519Keys()
+		sks[i] = sk
+		pksMap[i] = hex.EncodeToString(pk)
+	}
 
 	// write to configure files
 	for i, name := range idNameMap {
@@ -113,7 +141,9 @@ func main() {
 		viperWrite.Set("name", name)
 		viperWrite.Set("address", idIPMap[i])
 		viperWrite.Set("p2p_port", idP2PPortMap[i])
+		viperWrite.Set("p2p_port_payload", idP2PPortPayloadMap[i])
 		viperWrite.Set("id_p2p_port", idP2PPortMap)
+		viperWrite.Set("id_p2p_port_payload", idP2PPortPayloadMap)
 		//viperWrite.Set("rpc_listen_port", rpcListenPort)
 		viperWrite.Set("TSShare", hex.EncodeToString(shareAsBytes))
 		viperWrite.Set("TSPubKey", hex.EncodeToString(tsPubKeyAsBytes))
@@ -122,13 +152,16 @@ func main() {
 		viperWrite.Set("timeout", timeOut)
 		viperWrite.Set("id_name", idNameMap)
 		viperWrite.Set("id_ip", idIPMap)
-		viperWrite.Set("mock_latency", mock_latency)
+		viperWrite.Set("mock_latency", mockLatency)
 		viperWrite.Set("ddos", ddos)
+		viperWrite.Set("ddos_delay", ddosDelay)
 		viperWrite.Set("max_payload_size", max_payload_size)
 		viperWrite.Set("max_payload_count", max_payload_count)
-		viperWrite.Set("rate", rate)
 		viperWrite.Set("tx_size", tx_size)
+		viperWrite.Set("rate", rate)
 		viperWrite.Set("wait_time", wait_time)
+		viperWrite.Set("pri_key", hex.EncodeToString(sks[i]))
+		viperWrite.Set("pub_key_map", pksMap)
 		viperWrite.WriteConfig()
 	}
 }

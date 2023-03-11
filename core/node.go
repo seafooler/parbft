@@ -6,6 +6,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/seafooler/parbft/config"
 	"github.com/seafooler/parbft/conn"
+	"github.com/valyala/gorpc"
+	"log"
 	"reflect"
 	"sync"
 	"time"
@@ -23,6 +25,12 @@ type Node struct {
 
 	trans *conn.NetworkTransport
 
+	rpcClientsMap     map[int]*gorpc.Client
+	payLoads          map[[HASHSIZE]byte]bool
+	committedPayloads map[[HASHSIZE]byte]bool
+	proposedPayloads  map[[HASHSIZE]byte]bool
+	maxNumInPayLoad   int
+
 	// readyData can be sent from the optimistic path or the final ABA
 	readyData chan ReadyData
 
@@ -30,7 +38,7 @@ type Node struct {
 
 	committedHeight    int
 	maxProofedHeight   int
-	proofedHeight      map[int]int
+	proofedHeight      map[int][][HASHSIZE]byte
 	startedSMVBAHeight int
 	startedHSHeight    int
 
@@ -53,9 +61,14 @@ func NewNode(conf *config.Config) *Node {
 		abaMap:            map[int]*ABA{},
 
 		committedHeight: -1,
-		proofedHeight:   make(map[int]int),
-		maxCachedTxs:    conf.MaxPayloadCount * (conf.MaxPayloadSize / conf.TxSize),
+		proofedHeight:   make(map[int][][HASHSIZE]byte),
 		optPathFinishCh: make(map[int]chan struct{}),
+
+		maxNumInPayLoad:   conf.MaxPayloadSize / conf.TxSize,
+		payLoads:          make(map[[HASHSIZE]byte]bool),
+		committedPayloads: make(map[[HASHSIZE]byte]bool),
+		proposedPayloads:  make(map[[HASHSIZE]byte]bool),
+		rpcClientsMap:     make(map[int]*gorpc.Client),
 	}
 
 	node.logger = hclog.New(&hclog.LoggerOptions{
@@ -79,22 +92,86 @@ func (n *Node) StartP2PListen() error {
 	return nil
 }
 
+func (n *Node) StartListenRPC() {
+	gorpc.RegisterType(&PayLoadMsg{})
+	s := &gorpc.Server{
+		// Accept clients on this TCP address.
+		Addr: ":" + n.P2pPortPayload,
+
+		SendBufferSize: 100 * 1024 * 1024,
+
+		RecvBufferSize: 100 * 1024 * 1024,
+
+		Handler: func(clientAddr string, payLoad interface{}) interface{} {
+			assertedPayLoad, ok := payLoad.(*PayLoadMsg)
+			if !ok {
+				panic("message send is not a payload")
+			}
+			n.Lock()
+			defer n.Unlock()
+			if _, ok := n.committedPayloads[assertedPayLoad.Hash]; ok {
+				n.logger.Debug("Receive an already committed payload", "sender", assertedPayLoad.Sender, "hash",
+					string(assertedPayLoad.Hash[:]))
+			} else {
+				n.payLoads[assertedPayLoad.Hash] = true
+				n.logger.Debug("Receive a payload", "sender", assertedPayLoad.Sender, "hash",
+					string(assertedPayLoad.Hash[:]), "payload count", len(n.payLoads))
+			}
+			return nil
+		},
+	}
+	if err := s.Serve(); err != nil {
+		log.Fatalf("Cannot start rpc server: %s", err)
+	}
+}
+
 // BroadcastPayLoad mocks the underlying payload broadcast
-func (n *Node) BroadcastPayLoad() {
-	payLoadFullTime := 1000 * float32(n.Config.MaxPayloadSize) / float32(n.Config.TxSize*n.Rate)
+func (n *Node) BroadcastPayLoadLoop() {
+	gorpc.RegisterType(&PayLoadMsg{})
+	payLoadFullTime := float32(n.Config.MaxPayloadSize) / float32(n.Config.TxSize*n.Rate)
+
+	n.logger.Info("payloadFullTime", "s", payLoadFullTime)
+
 	for {
-		time.Sleep(time.Duration(payLoadFullTime) * time.Millisecond)
+		time.Sleep(time.Duration(payLoadFullTime*1000) * time.Millisecond)
 		txNum := int(float32(n.Rate) * payLoadFullTime)
+		mockHash, err := genMsgHashSum([]byte(fmt.Sprintf("%d%v", n.Id, time.Now())))
+		if err != nil {
+			panic(err)
+		}
+		start := time.Now()
+		var buf [HASHSIZE]byte
+		copy(buf[0:HASHSIZE], mockHash[:])
 		payLoadMsg := PayLoadMsg{
+			Sender: n.Name,
+			// Mock a hash
+			Hash: buf,
 			Reqs: make([][]byte, txNum),
 		}
+		n.logger.Debug("1st step takes", "ms", time.Now().Sub(start).Milliseconds())
+		start = time.Now()
 		for i := 0; i < txNum; i++ {
 			payLoadMsg.Reqs[i] = make([]byte, n.Config.TxSize)
 			payLoadMsg.Reqs[i][n.Config.TxSize-1] = '0'
 		}
-		n.PlainBroadcast(PayLoadMsgTag, payLoadMsg, nil)
-		time.Sleep(time.Millisecond * 100)
+		n.logger.Debug("2nd step takes", "ms", time.Now().Sub(start).Milliseconds())
+		n.BroadcastPayLoad(payLoadMsg, buf[:])
+		//time.Sleep(time.Millisecond * 100)
 	}
+}
+
+// BroadcastPayLoad broadcasts the payload in its best effort
+func (n *Node) BroadcastPayLoad(data interface{}, hash []byte) error {
+	for i, _ := range n.Id2AddrMap {
+		go func(id int) {
+			start := time.Now()
+			if _, err := n.rpcClientsMap[id].Call(data); err != nil {
+				panic(err)
+			}
+			n.logger.Debug("Sending a payload", "ms", time.Now().Sub(start).Milliseconds(), "hash", string(hash))
+		}(i)
+	}
+	return nil
 }
 
 // HandleMsgsLoop starts a loop to deal with the msgs from other peers.
@@ -179,20 +256,16 @@ func (n *Node) HandleMsgsLoop() {
 				}
 			}
 
-			curTime := time.Now()
-			estimatdTxNum := int(curTime.Sub(n.lastBlockCreatedTime).Seconds() * float64(n.Config.Rate))
-			if estimatdTxNum > n.maxCachedTxs {
-				estimatdTxNum = n.maxCachedTxs
-			}
+			n.Lock()
+			payLoadHashes, cnt := n.createBlock()
+			n.Unlock()
 
 			newBlock := &Block{
-				TxNum:    estimatdTxNum,
-				Reqs:     nil,
-				Height:   data.Height + 1,
-				Proposer: n.Id,
+				TxNum:         cnt * n.maxNumInPayLoad,
+				PayLoadHashes: payLoadHashes,
+				Height:        data.Height + 1,
+				Proposer:      n.Id,
 			}
-
-			n.lastBlockCreatedTime = curTime
 
 			sigCh := make(chan struct{}, 2)
 
@@ -234,7 +307,7 @@ func (n *Node) HandleMsgsLoop() {
 					n.logger.Debug("pessimistic path is launched", "height", blk.Height)
 					//n.LaunchPessimisticPath(blk)
 					n.smvbaMap[blk.Height].RunOneMVBAView(false,
-						[]byte(fmt.Sprintf("%d", blk.Height)), nil, blk.TxNum, -1)
+						payLoadHashes, nil, blk.TxNum, -1)
 				}
 			}(timer, sigCh, newBlock)
 		}
@@ -290,7 +363,7 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 		return
 	} else {
 		// previous height has not been committed
-		n.proofedHeight[prevHeight] = data.TxCount
+		n.proofedHeight[prevHeight] = data.PayLoadHashes
 		n.maxProofedHeight = prevHeight
 
 		// initialize the ABA
@@ -306,7 +379,7 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 				return
 			case <-t.C:
 				pH := dat.Height - 1
-				go n.abaMap[pH].inputValue(pH, dat.TxCount, 0)
+				go n.abaMap[pH].inputValue(pH, dat.PayLoadHashes, 0)
 			}
 		}(data, ch, t)
 
@@ -328,9 +401,23 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 
 // tryCommit must be wrapped in a lock
 func (n *Node) tryCommit(height int) error {
-	if txNum, ok := n.proofedHeight[height-2]; ok {
+	if payLoadHashes, ok := n.proofedHeight[height-2]; ok {
+		committedCount := 0
+		n.Lock()
+		for _, plHash := range payLoadHashes {
+			if _, ok := n.payLoads[plHash]; ok {
+				delete(n.payLoads, plHash)
+				committedCount++
+			} else {
+				if _, existed := n.committedPayloads[plHash]; !existed {
+					n.committedPayloads[plHash] = true
+					committedCount++
+				}
+			}
+		}
+		n.Unlock()
 		n.logger.Info("commit the block from the optimistic path", "replica", n.Name, "block_index", height-2,
-			"tx_num", txNum)
+			"committed_payload_cnt", committedCount, "payload_after_commit", len(n.payLoads))
 		// Todo: check the consecutive commitment
 		n.committedHeight = height - 2
 		delete(n.proofedHeight, height-2)
@@ -345,6 +432,28 @@ func (n *Node) tryCommit(height int) error {
 	}
 
 	return nil
+}
+
+// createBlock must be called in a concurrent context
+func (n *Node) createBlock() ([][HASHSIZE]byte, int) {
+	var payLoadHashes [][HASHSIZE]byte
+	payLoadCount := len(n.payLoads)
+	if payLoadCount < n.MaxPayloadCount {
+		payLoadHashes = make([][HASHSIZE]byte, payLoadCount)
+	} else {
+		payLoadHashes = make([][HASHSIZE]byte, n.MaxPayloadCount)
+	}
+	i := 0
+	for ph, _ := range n.payLoads {
+		if _, ok := n.proposedPayloads[ph]; !ok {
+			payLoadHashes[i] = ph
+		}
+		i++
+		if i >= len(payLoadHashes) {
+			break
+		}
+	}
+	return payLoadHashes, i - 1
 }
 
 // processItNow caches sMVBA and ABA messages from the future heights or ignore obsolete messages
@@ -414,6 +523,20 @@ func (n *Node) EstablishP2PConns() error {
 		n.logger.Debug("connection has been established", "sender", n.Name, "receiver", addr)
 	}
 	return nil
+}
+
+func (n *Node) EstablishRPCConns() {
+	for name, addr := range n.Id2AddrMap {
+		addrWithPort := addr + ":" + n.Id2PortPayLoadMap[name]
+		c := &gorpc.Client{
+			Addr:           addrWithPort,
+			RequestTimeout: 100 * time.Second,
+			SendBufferSize: 100 * 1024 * 1024,
+			RecvBufferSize: 100 * 1024 * 1024,
+		}
+		n.rpcClientsMap[name] = c
+		c.Start()
+	}
 }
 
 // SendMsg sends a message to another peer identified by the addrPort (e.g., 127.0.0.1:7788)

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/seafooler/sign_tools"
 	"strconv"
 	"testing"
 )
@@ -18,7 +19,7 @@ func checkEqualString(a, b string, logInfo string, t *testing.T) {
 }
 
 func TestConfigLoad(t *testing.T) {
-	conf, err := LoadConfig("", "config")
+	conf, err := LoadConfig("", "node0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,26 +29,26 @@ func TestConfigLoad(t *testing.T) {
 	checkEqualInt(conf.Id, 0, "Id", t)
 	checkEqualInt(conf.LogLevel, 3, "LogLevel", t)
 
-	checkEqualString(conf.Addr, "8.213.130.208", "Addr", t)
+	checkEqualString(conf.Addr, "54.221.157.253", "Addr", t)
 	checkEqualString(conf.Name, "node0", "Name", t)
-	checkEqualString(conf.P2pPort, "9000", "P2pPort", t)
+	checkEqualString(conf.P2pPort, "8000", "P2pPort", t)
 
 	for id, addr := range conf.Id2AddrMap {
 		switch id {
 		case 0:
-			if addr != "8.213.130.208" {
+			if addr != "54.221.157.253" {
 				t.Fatal("Id2AddrMap is loaded incorrectly")
 			}
 		case 1:
-			if addr != "47.74.91.50" {
+			if addr != "13.49.0.28" {
 				t.Fatal("Id2AddrMap is loaded incorrectly")
 			}
 		case 2:
-			if addr != "47.254.33.104" {
+			if addr != "54.250.243.96" {
 				t.Fatal("Id2AddrMap is loaded incorrectly")
 			}
 		case 3:
-			if addr != "47.245.56.147" {
+			if addr != "52.65.226.163" {
 				t.Fatal("Id2AddrMap is loaded incorrectly")
 			}
 		default:
@@ -68,8 +69,15 @@ func TestConfigLoad(t *testing.T) {
 	}
 
 	for _, po := range conf.Id2PortMap {
-		if po != "9000" {
+		if po != "8000" {
 			t.Fatal("Id2PortMap is loaded incorrectly")
 		}
 	}
+
+	dataToSign := []byte("seafooler")
+	sig := sign_tools.SignEd25519(conf.PriKeyED, dataToSign)
+	if ok, err := sign_tools.VerifySignEd25519(conf.PubKeyED[0], dataToSign, sig); !ok || err != nil {
+		t.Fatal("ed25519 is set wrong")
+	}
+
 }
