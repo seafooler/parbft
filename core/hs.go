@@ -64,7 +64,7 @@ func (h *HS) BroadcastProposalProof(height int) error {
 	blk := &Block{
 		TxNum:         cnt * h.node.maxNumInPayLoad,
 		PayLoadHashes: payLoadHashes,
-		Height:        pr.Height,
+		Height:        pr.Height + 1,
 		Proposer:      h.node.Id,
 	}
 
