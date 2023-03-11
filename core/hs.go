@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"github.com/hashicorp/go-hclog"
 	"github.com/seafooler/sign_tools"
 	"sync"
@@ -54,7 +55,7 @@ func (h *HS) BroadcastProposalProof(height int) error {
 
 	if pr.Height != height-1 {
 		h.hLogger.Error("Height of proof is incorrect", "pr.Height", pr.Height, "blk.Height", height)
-		//return errors.New("height of proof is incorrect")
+		return errors.New("height of proof is incorrect")
 	}
 
 	h.node.Lock()
