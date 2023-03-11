@@ -388,7 +388,7 @@ func (b *ABA) handleExitMessage(msg *ABAExitMsg) error {
 		b.done = true
 		b.aLogger.Info("Return from ABA", "replica", b.node.Name, "output", b.output, "msg.Height", msg.Height)
 		go func() {
-			b.node.readyData <- ReadyData{
+			b.node.ReadyData <- ReadyData{
 				ComponentId:   1,
 				PayLoadHashes: msg.PayLoadHashes,
 				Height:        msg.Height,

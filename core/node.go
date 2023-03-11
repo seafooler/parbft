@@ -32,7 +32,7 @@ type Node struct {
 	maxNumInPayLoad   int
 
 	// readyData can be sent from the optimistic path or the final ABA
-	readyData chan ReadyData
+	ReadyData chan ReadyData
 
 	cachedMsgs map[int][]interface{} // cache the messages arrived in advance
 
@@ -55,7 +55,7 @@ func NewNode(conf *config.Config) *Node {
 	node := &Node{
 		Config:            conf,
 		reflectedTypesMap: reflectedTypesMap,
-		readyData:         make(chan ReadyData),
+		ReadyData:         make(chan ReadyData),
 		cachedMsgs:        make(map[int][]interface{}),
 		smvbaMap:          map[int]*SMVBA{},
 		abaMap:            map[int]*ABA{},
@@ -239,7 +239,7 @@ func (n *Node) HandleMsgsLoop() {
 			default:
 				n.logger.Error("Unknown type of the received message!")
 			}
-		case data := <-n.readyData:
+		case data := <-n.ReadyData:
 
 			if data.ComponentId == 0 && data.Height >= 2 {
 				if sigCh, ok := n.optPathFinishCh[data.Height-2]; !ok {

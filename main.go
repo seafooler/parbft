@@ -45,10 +45,18 @@ func main() {
 
 	go node.HandleMsgsLoop()
 
+	//go func() {
+	//	node.Hs.ProofReady <- &core.ProofData{
+	//		Proof:  nil,
+	//		Height: -1,
+	//	}
+	//}()
+
 	go func() {
-		node.Hs.ProofReady <- &core.ProofData{
-			Proof:  nil,
-			Height: -1,
+		node.ReadyData <- core.ReadyData{
+			ComponentId:   0,
+			PayLoadHashes: nil,
+			Height:        -1,
 		}
 	}()
 
