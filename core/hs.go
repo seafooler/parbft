@@ -39,10 +39,19 @@ func NewHS(n *Node, leader int) *HS {
 
 // BroadcastProposalProof broadcasts the new block and proof of previous block through the ProposalMsg
 func (h *HS) BroadcastProposalProof(blk *Block) error {
-	if h.LeaderId != h.node.Id {
+	//if h.LeaderId != h.node.Id {
+	//	return nil
+	//}
+	pr := <-h.ProofReady
+
+	// the next leader is (height+1) %n
+	if h.node.Id != (pr.Height+1)%h.node.N {
+		h.hLogger.Info("b.node.Id != (proofReady.Height+1)%b.node.N", "b.node.Id", h.node.Id,
+			"(proofReady.Height+1)%b.node.N", (pr.Height+1)%h.node.N, "proofReady.Height", pr.Height,
+			"b.node.N", h.node.N)
 		return nil
 	}
-	pr := <-h.ProofReady
+
 	if pr.Height != blk.Height-1 {
 		h.hLogger.Error("Height of proof is incorrect", "pr.Height", pr.Height, "blk.Height", blk.Height)
 	}
@@ -87,7 +96,7 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 		return err
 	}
 
-	if h.LeaderId == h.node.Id {
+	if h.node.Id == pm.Height%h.node.N {
 		return h.tryAssembleProof(pm.Height)
 	} else {
 		return nil
