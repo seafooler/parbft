@@ -54,7 +54,7 @@ func (h *HS) BroadcastProposalProof(height int) error {
 	pr := <-h.ProofReady
 
 	if pr.Height != height-1 {
-		h.hLogger.Error("Height of proof is incorrect", "pr.Height", pr.Height, "blk.Height", height)
+		h.hLogger.Error("Height of proof is incorrect", "pr.Height", pr.Height, "height-1", height-1)
 		return errors.New("height of proof is incorrect")
 	}
 
