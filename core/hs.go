@@ -46,7 +46,7 @@ func (h *HS) BroadcastProposalProof(height int) error {
 
 	// the next leader is (height+1) %n
 	if h.node.Id != height%h.node.N {
-		h.hLogger.Info("h.node.Id != height%h.node.N", "h.node.Id", h.node.Id,
+		h.hLogger.Debug("h.node.Id != height%h.node.N", "h.node.Id", h.node.Id,
 			"height%h.node.N", height%h.node.N, "height", height, "h.node.N", h.node.N)
 		return nil
 	}
@@ -192,7 +192,7 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 		h.hLogger.Error("fail to vote for the block", "block_index", pm.Height)
 		return err
 	} else {
-		h.hLogger.Info("successfully vote for the block", "block_index", pm.Height, "addrPort", leaderAddrPort)
+		h.hLogger.Debug("successfully vote for the block", "block_index", pm.Height, "addrPort", leaderAddrPort)
 	}
 	return nil
 }
