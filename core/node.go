@@ -241,6 +241,8 @@ func (n *Node) HandleMsgsLoop() {
 			}
 		case data := <-n.ReadyData:
 
+			n.logger.Info("receive a ready data", "height", data.Height)
+
 			if data.ComponentId == 0 && data.Height >= 2 {
 				if sigCh, ok := n.optPathFinishCh[data.Height-2]; !ok {
 					n.logger.Error("Receive a readydata but it is not broadcast by an optimistic path before",
