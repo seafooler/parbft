@@ -74,11 +74,12 @@ func (pb *PB) handlePBVALMsg(valMsg *SMVBAPBVALMessage) error {
 
 	// TODO: should sign over the data plus SNView rather than the only data
 	// TODO: simply use the first hash
-	hash, err := genMsgHashSum(valMsg.Data[0][:])
-	pb.dataHash = hash
+	//hash, err := genMsgHashSum(valMsg.Data[0][:])
+	hash, err := genMsgHashSum([]byte("mock data"))
 	if err != nil {
 		return err
 	}
+	pb.dataHash = hash
 	partialSig := sign_tools.SignTSPartial(pb.spb.s.node.PriKeyTS, hash)
 	votMsg := SMVBAPBVOTMessage{
 		Height:         valMsg.Height,
