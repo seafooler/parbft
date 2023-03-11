@@ -107,9 +107,7 @@ func (n *Node) StartListenRPC() {
 			if !ok {
 				panic("message send is not a payload")
 			}
-			n.logger.Info("before getting the block in StartListenRPC, 1111")
 			n.Lock()
-			n.logger.Info("got the block in StartListenRPC, 2222")
 			defer n.Unlock()
 			if _, ok := n.committedPayloads[assertedPayLoad.Hash]; ok {
 				n.logger.Debug("Receive an already committed payload", "sender", assertedPayLoad.Sender, "hash",
@@ -119,7 +117,6 @@ func (n *Node) StartListenRPC() {
 				n.logger.Debug("Receive a payload", "sender", assertedPayLoad.Sender, "hash",
 					string(assertedPayLoad.Hash[:]), "payload count", len(n.payLoads))
 			}
-			n.logger.Info("releasing the block in StartListenRPC, 33333")
 			return nil
 		},
 	}
@@ -312,12 +309,9 @@ func (n *Node) HandleMsgsLoop() {
 				case <-t.C:
 					n.logger.Debug("pessimistic path is launched", "height", height)
 					//n.LaunchPessimisticPath(blk)
-					n.logger.Info("before getting the block in launching the pessimistic path, 1111")
 					n.Lock()
-					n.logger.Info("got the block in launching the pessimistic path, 2222")
 					payLoadHashes, cnt := n.createBlock()
 					n.Unlock()
-					n.logger.Info("releasing the block in launch the pessimistic path, 33333")
 					n.smvbaMap[height].RunOneMVBAView(false,
 						payLoadHashes, nil, cnt*n.maxNumInPayLoad, -1)
 				}
@@ -365,9 +359,7 @@ func (n *Node) InitializePessimisticPath(height int) {
 
 func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t *time.Timer) {
 	n.logger.Debug("Update the node status", "replica", n.Name, "data", data)
-	n.logger.Info("before getting the block in updateStatusByOptimisticData, 1111")
 	n.Lock()
-	n.logger.Info("got the block in updateStatusByOptimisticData, 2222")
 	defer n.Unlock()
 
 	prevHeight := data.Height - 1
@@ -411,16 +403,13 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 	if _, ok := n.proofedHeight[data.Height+2]; ok {
 		n.tryCommit(data.Height + 2)
 	}
-	n.logger.Info("releasing the block in updateStatusByOptimisticData, 33333")
 }
 
 // tryCommit must be wrapped in a lock
 func (n *Node) tryCommit(height int) error {
 	if payLoadHashes, ok := n.proofedHeight[height-2]; ok {
 		committedCount := 0
-		n.logger.Info("before getting the block in tryCommit, 1111")
 		//n.Lock()
-		n.logger.Info("got the block in tryCommit, 2222")
 		for _, plHash := range payLoadHashes {
 			if _, ok := n.payLoads[plHash]; ok {
 				delete(n.payLoads, plHash)
@@ -433,7 +422,6 @@ func (n *Node) tryCommit(height int) error {
 			}
 		}
 		//n.Unlock()
-		n.logger.Info("after getting the block in tryCommit, 33333")
 		n.logger.Info("commit the block from the optimistic path", "replica", n.Name, "block_index", height-2,
 			"committed_payload_cnt", committedCount, "payload_after_commit", len(n.payLoads))
 		// Todo: check the consecutive commitment
