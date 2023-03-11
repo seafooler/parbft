@@ -256,21 +256,21 @@ func (n *Node) HandleMsgsLoop() {
 				}
 			}
 
-			n.Lock()
-			payLoadHashes, cnt := n.createBlock()
-			n.Unlock()
-
-			newBlock := &Block{
-				TxNum:         cnt * n.maxNumInPayLoad,
-				PayLoadHashes: payLoadHashes,
-				Height:        data.Height + 1,
-				Proposer:      n.Id,
-			}
+			//n.Lock()
+			//payLoadHashes, cnt := n.createBlock()
+			//n.Unlock()
+			//
+			//newBlock := &Block{
+			//	TxNum:         cnt * n.maxNumInPayLoad,
+			//	PayLoadHashes: payLoadHashes,
+			//	Height:        data.Height + 1,
+			//	Proposer:      n.Id,
+			//}
 
 			sigCh := make(chan struct{}, 2)
 
 			// initialize the pessimistic path
-			n.InitializePessimisticPath(newBlock)
+			n.InitializePessimisticPath(data.Height + 1)
 
 			if data.ComponentId == 0 {
 				// timer is set as 5\Delta, namely 2.5 timeout
@@ -288,51 +288,54 @@ func (n *Node) HandleMsgsLoop() {
 			}
 
 			// continue the optimistic path
-			if newBlock.Height == n.startedHSHeight+1 {
-				n.optPathFinishCh[newBlock.Height] = sigCh
-				n.LaunchOptimisticPath(newBlock)
-				n.startedHSHeight++
-			}
+			//if newBlock.Height == n.startedHSHeight+1 {
+			n.optPathFinishCh[data.Height+1] = sigCh
+			n.LaunchOptimisticPath(data.Height + 1)
+			//n.startedHSHeight++
+			//}
 
 			// timer is set as 5\Delta, namely 2.5 timeout
 			timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
 
 			// launch the pessimistic path
-			go func(t *time.Timer, ch chan struct{}, blk *Block) {
+			go func(t *time.Timer, ch chan struct{}, height int) {
 				select {
 				case <-ch:
-					n.logger.Debug("!!! Receive a channel signal", "height", blk.Height)
+					n.logger.Debug("!!! Receive a channel signal", "height", height)
 					return
 				case <-t.C:
-					n.logger.Debug("pessimistic path is launched", "height", blk.Height)
+					n.logger.Debug("pessimistic path is launched", "height", height)
 					//n.LaunchPessimisticPath(blk)
-					n.smvbaMap[blk.Height].RunOneMVBAView(false,
-						payLoadHashes, nil, blk.TxNum, -1)
+					n.Lock()
+					payLoadHashes, cnt := n.createBlock()
+					n.Unlock()
+					n.smvbaMap[height].RunOneMVBAView(false,
+						payLoadHashes, nil, cnt*n.maxNumInPayLoad, -1)
 				}
-			}(timer, sigCh, newBlock)
+			}(timer, sigCh, data.Height+1)
 		}
 	}
 }
 
-func (n *Node) LaunchOptimisticPath(blk *Block) {
-	go func(blk *Block) {
-		if err := n.Hs.BroadcastProposalProof(blk); err != nil {
-			n.logger.Error("fail to broadcast proposal and proof", "height", blk.Height,
+func (n *Node) LaunchOptimisticPath(height int) {
+	go func(h int) {
+		if err := n.Hs.BroadcastProposalProof(h); err != nil {
+			n.logger.Error("fail to broadcast proposal and proof", "height", h,
 				"err", err.Error())
 		} else {
-			n.logger.Debug("successfully broadcast a new proposal and proof", "height", blk.Height)
+			n.logger.Debug("successfully broadcast a new proposal and proof", "height", h)
 		}
-	}(blk)
+	}(height)
 }
 
-func (n *Node) InitializePessimisticPath(blk *Block) {
-	if _, ok := n.smvbaMap[blk.Height]; !ok {
-		n.smvbaMap[blk.Height] = NewSMVBA(n, blk.Height)
-		if n.abaMap[blk.Height] == nil {
-			n.abaMap[blk.Height] = NewABA(n, blk.Height)
+func (n *Node) InitializePessimisticPath(height int) {
+	if _, ok := n.smvbaMap[height]; !ok {
+		n.smvbaMap[height] = NewSMVBA(n, height)
+		if n.abaMap[height] == nil {
+			n.abaMap[height] = NewABA(n, height)
 		}
-		n.startedSMVBAHeight = blk.Height
-		n.restoreMessages(blk.Height)
+		n.startedSMVBAHeight = height
+		n.restoreMessages(height)
 	}
 }
 

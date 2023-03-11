@@ -45,12 +45,6 @@ func main() {
 
 	go node.HandleMsgsLoop()
 
-	newBlock := &core.Block{
-		PayLoadHashes: nil,
-		Height:        0,
-		Proposer:      node.Id,
-	}
-
 	if node.Id == node.Hs.LeaderId {
 		go func() {
 			node.Hs.ProofReady <- &core.ProofData{
@@ -61,7 +55,7 @@ func main() {
 	}
 
 	// launch the optimistic path
-	node.LaunchOptimisticPath(newBlock)
+	node.LaunchOptimisticPath(0)
 
 	// launch the pessimistic path
 	//node.LaunchPessimisticPath(newBlock)

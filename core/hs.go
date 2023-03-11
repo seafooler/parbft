@@ -38,7 +38,7 @@ func NewHS(n *Node, leader int) *HS {
 }
 
 // BroadcastProposalProof broadcasts the new block and proof of previous block through the ProposalMsg
-func (h *HS) BroadcastProposalProof(blk *Block) error {
+func (h *HS) BroadcastProposalProof(height int) error {
 	//if h.LeaderId != h.node.Id {
 	//	return nil
 	//}
@@ -50,6 +50,17 @@ func (h *HS) BroadcastProposalProof(blk *Block) error {
 			"(proofReady.Height+1)%b.node.N", (pr.Height+1)%h.node.N, "proofReady.Height", pr.Height,
 			"b.node.N", h.node.N)
 		return nil
+	}
+
+	h.node.Lock()
+	payLoadHashes, cnt := h.node.createBlock()
+	h.node.Unlock()
+
+	blk := &Block{
+		TxNum:         cnt * h.node.maxNumInPayLoad,
+		PayLoadHashes: payLoadHashes,
+		Height:        height,
+		Proposer:      h.node.Id,
 	}
 
 	if pr.Height != blk.Height-1 {
