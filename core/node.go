@@ -288,6 +288,7 @@ func (n *Node) HandleMsgsLoop() {
 				//}
 				n.logger.Info("receive a result from final ABA but do not commit", "replica", n.Name,
 					"block_index", data.Height)
+				continue
 			}
 
 			// continue the optimistic path
