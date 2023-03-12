@@ -244,12 +244,12 @@ class Bench:
             # Run the benchmark.
             for d in bench_parameters.mock_latencies:
                 # Upload all configuration files.
-                # try:
-                #     self._config(hosts, d)
-                #     # self._config()
-                # except (subprocess.SubprocessError, GroupException) as e:
-                #     e = FabricError(e) if isinstance(e, GroupException) else e
-                #     Print.error(BenchError('Failed to configure nodes', e))
+                try:
+                    self._config(hosts, d)
+                    # self._config()
+                except (subprocess.SubprocessError, GroupException) as e:
+                    e = FabricError(e) if isinstance(e, GroupException) else e
+                    Print.error(BenchError('Failed to configure nodes', e))
 
                 boundary = "------------------- " + str(d) + "ms -------------------"
                 with open('/vagrant/parbft/benchmark/results/bench-16-0.txt', 'a') as f:

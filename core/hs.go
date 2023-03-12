@@ -58,12 +58,9 @@ func (h *HS) BroadcastProposalProof(height int) error {
 		return errors.New("height of proof is incorrect")
 	}
 
-	h.hLogger.Info("before acquiring a lock before creating block, 1111", "pr.Height", pr.Height)
 	h.node.Lock()
-	h.hLogger.Info("got a lock before creating block, 2222", "pr.Height", pr.Height)
 	payLoadHashes, cnt := h.node.createBlock(true)
 	h.node.Unlock()
-	h.hLogger.Info("after releasing a lock before creating block, 3333", "pr.Height", pr.Height)
 
 	blk := &Block{
 		TxNum:         cnt * h.node.maxNumInPayLoad,
@@ -86,10 +83,8 @@ func (h *HS) BroadcastProposalProof(height int) error {
 
 // ProcessHSProposalMsg votes for the current proposal and commits the previous-previous block
 func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
-	h.hLogger.Info("Process the HS Proposal Message", "block_index", pm.Height)
-	h.hLogger.Info("before acquiring the HS lock in ProcessHSProposalMsg, 11111", "height", pm.Height)
+	h.hLogger.Debug("Process the HS Proposal Message", "block_index", pm.Height)
 	h.Lock()
-	h.hLogger.Info("acquired the HS lock in ProcessHSProposalMsg, 222222", "height", pm.Height)
 	h.cachedHeight[pm.Height] = pm.PayLoadHashes
 	h.cachedBlockProposals[pm.Height] = pm
 	// do not retrieve the previous block nor verify the proof for the 0th block
@@ -101,8 +96,6 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 		h.tryCache(pm.Height+1, h.cachedBlockProposals[pm.Height+1].Proof, plHashes)
 	}
 	h.Unlock()
-
-	h.hLogger.Info("$$$$$$$$$$ 22222222222222")
 
 	go func() {
 		h.node.ReadyData <- ReadyData{
@@ -117,16 +110,11 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 		return err
 	}
 
-	h.hLogger.Info("$$$$$$$$$$ 33333333333333")
-
 	h.Lock()
 	defer h.Unlock()
 	if h.node.Id == pm.Height%h.node.N {
-		err := h.tryAssembleProof(pm.Height)
-		h.hLogger.Info("after releasing the HS lock in ProcessHSProposalMsg, 33333", "height", pm.Height)
-		return err
+		return h.tryAssembleProof(pm.Height)
 	} else {
-		h.hLogger.Info("after releasing the HS lock in ProcessHSProposalMsg, 333333", "height", pm.Height)
 		return nil
 	}
 }
@@ -142,16 +130,12 @@ func (h *HS) tryCache(height int, proof map[int][]byte, plHashes [][HASHSIZE]byt
 		return nil
 	}
 
-	h.hLogger.Info("tryCache $$$$$$$$$$ 11111", "height", height)
-
 	// verify the proof
 	blockBytes, err := encode(pBlk.Block)
 	if err != nil {
 		h.hLogger.Error("fail to encode the block", "block_index", height)
 		return err
 	}
-
-	h.hLogger.Info("tryCache $$$$$$$$$$ 22222", "height", height)
 
 	if len(proof) < h.node.N-h.node.F {
 		h.hLogger.Error("the number of signatures in the proof is not enough", "needed", h.node.N-h.node.F,
@@ -166,8 +150,6 @@ func (h *HS) tryCache(height int, proof map[int][]byte, plHashes [][HASHSIZE]byt
 		}
 	}
 
-	h.hLogger.Info("tryCache $$$$$$$$$$ 3333333", "height", height)
-
 	//if _, err := sign_tools.VerifyTS(h.node.PubKeyTS, blockBytes, proof); err != nil {
 	//	h.hLogger.Error("fail to verify proof of a previous block", "prev_block_index", pBlk.Height)
 	//	return err
@@ -175,21 +157,16 @@ func (h *HS) tryCache(height int, proof map[int][]byte, plHashes [][HASHSIZE]byt
 
 	delete(h.cachedHeight, pBlk.Height)
 
-	h.hLogger.Info("before acquiring a lock in tryCache, 1111")
 	h.node.Lock()
-	h.hLogger.Info("acquired a lock in tryCache, 2222")
 	for _, hx := range plHashes {
 		h.node.proposedPayloads[hx] = true
 	}
 	h.node.Unlock()
-	h.hLogger.Info("after releasing acquiring a lock in tryCache, 3333")
 
 	// if there is already a subsequent block, deal with it
 	if hashes, ok := h.cachedHeight[height+1]; ok {
 		h.tryCache(height+1, h.cachedBlockProposals[height+1].Proof, hashes)
 	}
-
-	h.hLogger.Info("tryCache $$$$$$$$$$ 44444444", "height", height)
 
 	return nil
 }
@@ -209,8 +186,6 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 		Height: pm.Height,
 		Voter:  h.node.Id,
 	}
-
-	h.hLogger.Info("@@@@@@@@@@@@@@@@@@@ 2222222222222", "height", pm.Height)
 
 	// the next leader is (pm.Height+1)%b.node.N
 	leaderAddrPort := h.node.Id2AddrMap[(pm.Height+1)%h.node.N] + ":" + h.node.Id2PortMap[(pm.Height+1)%h.node.N]

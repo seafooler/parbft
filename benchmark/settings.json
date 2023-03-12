@@ -11,7 +11,7 @@
   "repo": {
     "name": "parbft",
     "url": "https://github.com/seafooler/parbft.git",
-    "branch": "parbft2"
+    "branch": "parbft1"
   },
   "instances": {
     "type": "m5d.large",
