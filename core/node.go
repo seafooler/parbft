@@ -98,9 +98,9 @@ func (n *Node) StartListenRPC() {
 		// Accept clients on this TCP address.
 		Addr: ":" + n.P2pPortPayload,
 
-		SendBufferSize: 100 * 1024 * 1024,
+		SendBufferSize: 500 * 1024 * 1024,
 
-		RecvBufferSize: 100 * 1024 * 1024,
+		RecvBufferSize: 500 * 1024 * 1024,
 
 		Handler: func(clientAddr string, payLoad interface{}) interface{} {
 			assertedPayLoad, ok := payLoad.(*PayLoadMsg)
@@ -560,9 +560,10 @@ func (n *Node) EstablishRPCConns() {
 		addrWithPort := addr + ":" + n.Id2PortPayLoadMap[name]
 		c := &gorpc.Client{
 			Addr:           addrWithPort,
-			RequestTimeout: 100 * time.Second,
-			SendBufferSize: 100 * 1024 * 1024,
-			RecvBufferSize: 100 * 1024 * 1024,
+			RequestTimeout: 200 * time.Second,
+			SendBufferSize: 500 * 1024 * 1024,
+			RecvBufferSize: 500 * 1024 * 1024,
+			Conns:          10,
 		}
 		n.rpcClientsMap[name] = c
 		c.Start()
