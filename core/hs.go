@@ -204,12 +204,16 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 		return err
 	}
 
+	h.hLogger.Info("@@@@@@@@@@@@@@@@@@@ 1111111111111", "height", pm.Height)
+
 	sig := sign_tools.SignEd25519(h.node.Config.PriKeyED, blockBytes)
 	hsVoteMsg := HSVoteMsg{
 		EDSig:  sig,
 		Height: pm.Height,
 		Voter:  h.node.Id,
 	}
+
+	h.hLogger.Info("@@@@@@@@@@@@@@@@@@@ 2222222222222", "height", pm.Height)
 
 	// the next leader is (pm.Height+1)%b.node.N
 	leaderAddrPort := h.node.Id2AddrMap[(pm.Height+1)%h.node.N] + ":" + h.node.Id2PortMap[(pm.Height+1)%h.node.N]
