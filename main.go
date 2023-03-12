@@ -76,7 +76,7 @@ func main() {
 	//node.LaunchPessimisticPath(newBlock)
 
 	for {
-		//node.BroadcastPayLoadLoop()
-		time.Sleep(time.Millisecond * 100)
+		node.BroadcastPayLoadLoop()
+		//time.Sleep(time.Millisecond * 100)
 	}
 }
