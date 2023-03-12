@@ -34,11 +34,11 @@ class LogParser:
         # proposals, commits, sizes, self.received_samples, timeouts, self.configs \
         proposals, commits \
             = zip(*results)
-        
+
         #到这里得到的commits是4个node-* file的commit信息的字典组成的tuple: ({},{},{},{})
-        self.proposals = self._merge_nodes_proposal([x.items() for x in proposals])  
+        self.proposals = self._merge_nodes_proposal([x.items() for x in proposals])
         self.commits = self._merge_nodes_commit([x.items() for x in commits])
-        
+
         #到这里merge后就得到了一个大字典
     def _merge_nodes_proposal(self, input):
         #单纯的为了合并4个dict，可以偷偷把commit时间算成最早的,同时我们忽略前两个块
@@ -71,18 +71,22 @@ class LogParser:
         ##有几个node就会被调用几遍
         tmp = findall(r'(.*Z).*successfully broadcast.*height=(.*)',log) #[('2023-03-04T02:01:33.655Z', '8'), ('2023-03-04T02:01:33.799Z', '9'), ('2023-03-04T02:01:41.643Z', '63')]
         tmp = [(d, self._to_posix(t)) for t, d in tmp]
+        # discard the unstable records at the beginning
+        tmp = [(str(d), t) for d, t in tmp if int(d) >= 6]
+
         proposals = self._merge_results_proposal(tmp)
 
-        tmp = findall(r'(.*Z).*commit the block from the optimistic path.*block_index=(.*) tx_num=(.*)',log)
+        tmp = findall(r'(.*Z).*commit the block from the optimistic path.*block_index=(.*) committed_payload_cnt=(.*) .*',log)
         tmp = [(d, (self._to_posix(t), n)) for t, d, n in tmp]
+        tmp = [(str(d), t) for d, t in tmp if int(d) >= 6]
         commits = self._merge_results_commit(tmp)
 
         return proposals, commits#, sizes, samples, timeouts, configs
-    
+
     def _to_posix(self, string):
         x = datetime.fromisoformat(string.replace('Z', '+00:00'))
         return datetime.timestamp(x)
-    
+
     def _merge_results_proposal(self, input):
         # Keep the earliest timestamp.
         merged = {}
@@ -90,7 +94,7 @@ class LogParser:
             if not k in merged or merged[k] > t:
                 merged[k] = t
         return merged
-    
+
     def _merge_results_commit(self, input):
         # Keep the earliest timestamp.
         merged = {}
@@ -107,7 +111,7 @@ class LogParser:
         duration = end - start
         #bytes = sum(self.sizes.values())
         #bps = bytes / duration
-        tps = sum(int(n) for d,(t,n) in self.commits.items()) / duration
+        tps = sum(int(n)*50000/256 for d,(t,n) in self.commits.items()) / duration
         return tps, duration
 
     def _consensus_latency(self):

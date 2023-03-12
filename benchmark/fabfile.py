@@ -7,7 +7,7 @@ from aws.remote import Bench, BenchError
 
 
 @task
-def create(ctx, nodes=1):
+def create(ctx, nodes=4):
     ''' Create a testbed'''
     try:
         InstanceManager.make().create_instances(nodes)
@@ -66,10 +66,10 @@ def remote(ctx):
     bench_params = {
         'nodes': [16],
         'faults': 0,
-        'duration': 100,
-        'runs': 3,
+        'duration': 150,
+        'runs': 1,
         'timeout_delay': 5000,
-        'mock_latency': [600,700],
+        'mock_latency': [0],
     }
     try:
         Bench(ctx).run(bench_params, debug=False)
