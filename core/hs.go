@@ -87,7 +87,9 @@ func (h *HS) BroadcastProposalProof(height int) error {
 // ProcessHSProposalMsg votes for the current proposal and commits the previous-previous block
 func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	h.hLogger.Info("Process the HS Proposal Message", "block_index", pm.Height)
+	h.hLogger.Info("before acquiring the HS lock in ProcessHSProposalMsg, 11111", "height", pm.Height)
 	h.Lock()
+	h.hLogger.Info("acquired the HS lock in ProcessHSProposalMsg, 222222", "height", pm.Height)
 	defer h.Unlock()
 	h.cachedHeight[pm.Height] = pm.PayLoadHashes
 	h.cachedBlockProposals[pm.Height] = pm
@@ -114,8 +116,11 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	}
 
 	if h.node.Id == pm.Height%h.node.N {
-		return h.tryAssembleProof(pm.Height)
+		err := h.tryAssembleProof(pm.Height)
+		h.hLogger.Info("after releasing the HS lock in ProcessHSProposalMsg, 33333", "height", pm.Height)
+		return err
 	} else {
+		h.hLogger.Info("after releasing the HS lock in ProcessHSProposalMsg, 333333", "height", pm.Height)
 		return nil
 	}
 }
