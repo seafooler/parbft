@@ -39,11 +39,11 @@ func main() {
 
 	node.EstablishRPCConns()
 
-	go node.HandleMsgsLoop()
-
 	// Help all the replicas to start simultaneously
 	node.BroadcastSyncLaunchMsgs()
 	node.WaitForEnoughSyncLaunchMsgs()
+
+	go node.HandleMsgsLoop()
 
 	if node.Id == 0 {
 		go func() {
