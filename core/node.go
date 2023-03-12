@@ -107,7 +107,9 @@ func (n *Node) StartListenRPC() {
 			if !ok {
 				panic("message send is not a payload")
 			}
+			n.logger.Info("before acquiring a lock before in rpc handler, 1111")
 			n.Lock()
+			n.logger.Info("acquired a lock before in rpc handler, 2222")
 			defer n.Unlock()
 			if _, ok := n.committedPayloads[assertedPayLoad.Hash]; ok {
 				n.logger.Debug("Receive an already committed payload", "sender", assertedPayLoad.Sender, "hash",
@@ -117,6 +119,7 @@ func (n *Node) StartListenRPC() {
 				n.logger.Debug("Receive a payload", "sender", assertedPayLoad.Sender, "hash",
 					string(assertedPayLoad.Hash[:]), "payload count", len(n.payLoads))
 			}
+			n.logger.Info("after releasing a lock before in rpc handler, 3333")
 			return nil
 		},
 	}
@@ -316,9 +319,12 @@ func (n *Node) HandleMsgsLoop() {
 				case <-t.C:
 					n.logger.Debug("pessimistic path is launched", "height", height)
 					//n.LaunchPessimisticPath(blk)
+					n.logger.Info("before acquiring a lock before creating block in launch pes path, 1111")
 					n.Lock()
+					n.logger.Info("acquired a lock before creating block in launch pes path, 2222")
 					payLoadHashes, cnt := n.createBlock(false)
 					n.Unlock()
+					n.logger.Info("after releasing a lock before creating block in launch pes path, 3333")
 					n.smvbaMap[height].RunOneMVBAView(false,
 						payLoadHashes, nil, cnt*n.maxNumInPayLoad, -1)
 				}
@@ -366,9 +372,10 @@ func (n *Node) InitializePessimisticPath(height int) {
 
 func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t *time.Timer) {
 	n.logger.Debug("Update the node status", "replica", n.Name, "data", data)
+	n.logger.Info("before acquiring a lock in updateStatusByOptimisticData, 1111")
 	n.Lock()
 	defer n.Unlock()
-
+	n.logger.Info("acquired a lock in updateStatusByOptimisticData, 2222")
 	prevHeight := data.Height - 1
 
 	if prevHeight <= n.committedHeight {
@@ -410,6 +417,7 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 	if _, ok := n.proofedHeight[data.Height+2]; ok {
 		n.tryCommit(data.Height + 2)
 	}
+	n.logger.Info("after releasing a lock in updateStatusByOptimisticData, 3333")
 }
 
 // tryCommit must be wrapped in a lock

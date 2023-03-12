@@ -400,7 +400,9 @@ func (s *SMVBA) HaltOrPreVote(h, v, txCount int, coinNode string) {
 
 func (s *SMVBA) updatePayloads(payLoadHashes [][HASHSIZE]byte) int {
 	committedCount := 0
+	s.logger.Info("before acquiring a lock in updatePayloads, 1111")
 	s.node.Lock()
+	s.logger.Info("acquired a lock in updatePayloads, 2222")
 	for _, plHash := range payLoadHashes {
 		if _, ok := s.node.payLoads[plHash]; ok {
 			delete(s.node.payLoads, plHash)
@@ -413,6 +415,7 @@ func (s *SMVBA) updatePayloads(payLoadHashes [][HASHSIZE]byte) int {
 		}
 	}
 	s.node.Unlock()
+	s.logger.Info("after releasing a lock in updatePayloads, 3333")
 	return committedCount
 }
 

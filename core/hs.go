@@ -58,9 +58,12 @@ func (h *HS) BroadcastProposalProof(height int) error {
 		return errors.New("height of proof is incorrect")
 	}
 
+	h.hLogger.Info("before acquiring a lock before creating block, 1111")
 	h.node.Lock()
+	h.hLogger.Info("got a lock before creating block, 2222")
 	payLoadHashes, cnt := h.node.createBlock(true)
 	h.node.Unlock()
+	h.hLogger.Info("after releasing a lock before creating block, 3333")
 
 	blk := &Block{
 		TxNum:         cnt * h.node.maxNumInPayLoad,
@@ -155,11 +158,14 @@ func (h *HS) tryCache(height int, proof map[int][]byte, plHashes [][HASHSIZE]byt
 
 	delete(h.cachedHeight, pBlk.Height)
 
+	h.hLogger.Info("before acquiring a lock in tryCache, 1111")
 	h.node.Lock()
+	h.hLogger.Info("acquired a lock in tryCache, 2222")
 	for _, hx := range plHashes {
 		h.node.proposedPayloads[hx] = true
 	}
 	h.node.Unlock()
+	h.hLogger.Info("after releasing acquiring a lock in tryCache, 3333")
 
 	// if there is already a subsequent block, deal with it
 	if hashes, ok := h.cachedHeight[height+1]; ok {
