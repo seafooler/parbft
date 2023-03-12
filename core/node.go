@@ -236,8 +236,6 @@ func (n *Node) HandleMsgsLoop() {
 				if n.processItNow(msgAsserted.Height, msgAsserted) {
 					go n.abaMap[msgAsserted.Height].handleExitMessage(&msgAsserted)
 				}
-			case PayLoadMsg:
-				continue
 			case PaceSyncMsg:
 				continue
 			default:
@@ -561,7 +559,7 @@ func (n *Node) EstablishRPCConns() {
 		addrWithPort := addr + ":" + n.Id2PortPayLoadMap[name]
 		c := &gorpc.Client{
 			Addr:           addrWithPort,
-			RequestTimeout: 200 * time.Second,
+			RequestTimeout: 100 * time.Second,
 			SendBufferSize: 10 * 1024 * 1024,
 			RecvBufferSize: 10 * 1024 * 1024,
 			//Conns:          10,

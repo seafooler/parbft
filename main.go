@@ -33,10 +33,6 @@ func main() {
 	// wait for each node to start
 	time.Sleep(time.Second * time.Duration(conf.WaitTime))
 
-	// Help all the replicas to start simultaneously
-	node.BroadcastSyncLaunchMsgs()
-	node.WaitForEnoughSyncLaunchMsgs()
-
 	if err = node.EstablishP2PConns(); err != nil {
 		panic(err)
 	}
@@ -44,6 +40,10 @@ func main() {
 	node.EstablishRPCConns()
 
 	go node.HandleMsgsLoop()
+
+	// Help all the replicas to start simultaneously
+	node.BroadcastSyncLaunchMsgs()
+	node.WaitForEnoughSyncLaunchMsgs()
 
 	if node.Id == 0 {
 		go func() {
