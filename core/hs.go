@@ -90,7 +90,6 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	h.hLogger.Info("before acquiring the HS lock in ProcessHSProposalMsg, 11111", "height", pm.Height)
 	h.Lock()
 	h.hLogger.Info("acquired the HS lock in ProcessHSProposalMsg, 222222", "height", pm.Height)
-	defer h.Unlock()
 	h.cachedHeight[pm.Height] = pm.PayLoadHashes
 	h.cachedBlockProposals[pm.Height] = pm
 	// do not retrieve the previous block nor verify the proof for the 0th block
@@ -103,6 +102,7 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	if plHashes, ok := h.cachedHeight[pm.Height+1]; ok {
 		h.tryCache(pm.Height+1, h.cachedBlockProposals[pm.Height+1].Proof, plHashes)
 	}
+	h.Unlock()
 
 	h.hLogger.Info("$$$$$$$$$$ 22222222222222")
 
@@ -121,6 +121,8 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 
 	h.hLogger.Info("$$$$$$$$$$ 33333333333333")
 
+	h.Lock()
+	defer h.Unlock()
 	if h.node.Id == pm.Height%h.node.N {
 		h.hLogger.Info("$$$$$$$$$$ 4444444444444")
 		err := h.tryAssembleProof(pm.Height)
