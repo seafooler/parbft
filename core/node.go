@@ -107,9 +107,9 @@ func (n *Node) StartListenRPC() {
 			if !ok {
 				panic("message send is not a payload")
 			}
-			n.logger.Info("before acquiring a lock before in rpc handler, 1111")
+			n.logger.Debug("before acquiring a lock before in rpc handler, 1111")
 			n.Lock()
-			n.logger.Info("acquired a lock before in rpc handler, 2222")
+			n.logger.Debug("acquired a lock before in rpc handler, 2222")
 			defer n.Unlock()
 			if _, ok := n.committedPayloads[assertedPayLoad.Hash]; ok {
 				n.logger.Debug("Receive an already committed payload", "sender", assertedPayLoad.Sender, "hash",
@@ -119,7 +119,7 @@ func (n *Node) StartListenRPC() {
 				n.logger.Debug("Receive a payload", "sender", assertedPayLoad.Sender, "hash",
 					string(assertedPayLoad.Hash[:]), "payload count", len(n.payLoads))
 			}
-			n.logger.Info("after releasing a lock before in rpc handler, 3333")
+			n.logger.Debug("after releasing a lock before in rpc handler, 3333")
 			return nil
 		},
 	}
