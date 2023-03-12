@@ -205,14 +205,19 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 
 // ProcessHSVoteMsg stores the vote messages and attempts to create the ts proof
 func (h *HS) ProcessHSVoteMsg(vm *HSVoteMsg) error {
-	h.hLogger.Info("Process the Hs Vote Message", "block_index", vm.Height, "voter", vm.Voter)
+	h.hLogger.Info("Process the Hs Vote Message", "height", vm.Height, "voter", vm.Voter)
+	h.hLogger.Info("before acquiring the HS lock in ProcessHSVoteMsg", "height", vm.Height, "voter", vm.Voter)
 	h.Lock()
+	h.hLogger.Info("acquired the HS lock in ProcessHSVoteMsg", "height", vm.Height)
 	defer h.Unlock()
 	if _, ok := h.cachedVoteMsgs[vm.Height]; !ok {
 		h.cachedVoteMsgs[vm.Height] = make(map[int][]byte)
 	}
 	h.cachedVoteMsgs[vm.Height][vm.Voter] = vm.EDSig
-	return h.tryAssembleProof(vm.Height)
+	err := h.tryAssembleProof(vm.Height)
+	h.hLogger.Info("after releasing the HS lock in ProcessHSVoteMsg", "height", vm.Height, "len(votes)",
+		len(h.cachedVoteMsgs[vm.Height]))
+	return err
 }
 
 // tryAssembleProof must be wrapped in a lock
