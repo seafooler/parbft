@@ -600,23 +600,23 @@ func (n *Node) EstablishRPCConns() {
 
 // SendMsg sends a message to another peer identified by the addrPort (e.g., 127.0.0.1:7788)
 func (n *Node) SendMsg(tag byte, data interface{}, sig []byte, addrPort string) error {
-	n.logger.Info("%%%%%%%%%%%%%%%%%%% SendMsg 1111111111111")
+	n.logger.Debug("%%%%%%%%%%%%%%%%%%% SendMsg 1111111111111")
 	c, err := n.trans.GetConn(addrPort)
 	if err != nil {
 		return err
 	}
-	n.logger.Info("%%%%%%%%%%%%%%%%%%% SendMsg 22222222222222")
+	n.logger.Debug("%%%%%%%%%%%%%%%%%%% SendMsg 22222222222222")
 	time.Sleep(time.Millisecond * time.Duration(n.Config.MockLatency))
 	if err := conn.SendMsg(c, tag, data, sig); err != nil {
 		return err
 	}
 
-	n.logger.Info("%%%%%%%%%%%%%%%%%%% SendMsg 333333333333333")
+	n.logger.Debug("%%%%%%%%%%%%%%%%%%% SendMsg 333333333333333")
 
 	if err = n.trans.ReturnConn(c); err != nil {
 		return err
 	}
-	n.logger.Info("%%%%%%%%%%%%%%%%%%% SendMsg 444444444444444")
+	n.logger.Debug("%%%%%%%%%%%%%%%%%%% SendMsg 444444444444444")
 	return nil
 }
 

@@ -96,8 +96,6 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	// try to cache a previous block
 	h.tryCache(pm.Height, pm.Proof, pm.PayLoadHashes)
 
-	h.hLogger.Info("$$$$$$$$$$ 11111111111111")
-
 	// if there is already a subsequent block, deal with it
 	if plHashes, ok := h.cachedHeight[pm.Height+1]; ok {
 		h.tryCache(pm.Height+1, h.cachedBlockProposals[pm.Height+1].Proof, plHashes)
@@ -124,7 +122,6 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	h.Lock()
 	defer h.Unlock()
 	if h.node.Id == pm.Height%h.node.N {
-		h.hLogger.Info("$$$$$$$$$$ 4444444444444")
 		err := h.tryAssembleProof(pm.Height)
 		h.hLogger.Info("after releasing the HS lock in ProcessHSProposalMsg, 33333", "height", pm.Height)
 		return err
@@ -205,8 +202,6 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 		h.hLogger.Error("fail to encode the block", "block_index", pm.Height)
 		return err
 	}
-
-	h.hLogger.Info("@@@@@@@@@@@@@@@@@@@ 1111111111111", "height", pm.Height)
 
 	sig := sign_tools.SignEd25519(h.node.Config.PriKeyED, blockBytes)
 	hsVoteMsg := HSVoteMsg{
