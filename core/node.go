@@ -107,19 +107,19 @@ func (n *Node) StartListenRPC() {
 			if !ok {
 				panic("message send is not a payload")
 			}
-			n.logger.Info("before acquiring a lock before in rpc handler, 1111")
+			n.logger.Debug("before acquiring a lock before in rpc handler, 1111")
 			n.Lock()
-			n.logger.Info("acquired a lock before in rpc handler, 2222")
+			n.logger.Debug("acquired a lock before in rpc handler, 2222")
 			defer n.Unlock()
 			if _, ok := n.committedPayloads[assertedPayLoad.Hash]; ok {
-				n.logger.Info("Receive an already committed payload", "sender", assertedPayLoad.Sender, "hash",
+				n.logger.Debug("Receive an already committed payload", "sender", assertedPayLoad.Sender, "hash",
 					string(assertedPayLoad.Hash[:]))
 			} else {
 				n.payLoads[assertedPayLoad.Hash] = true
-				n.logger.Info("Receive a payload", "sender", assertedPayLoad.Sender, "hash",
+				n.logger.Debug("Receive a payload", "sender", assertedPayLoad.Sender, "hash",
 					string(assertedPayLoad.Hash[:]), "payload count", len(n.payLoads))
 			}
-			n.logger.Info("after releasing a lock before in rpc handler, 3333")
+			n.logger.Debug("after releasing a lock before in rpc handler, 3333")
 			return nil
 		},
 	}
@@ -171,7 +171,8 @@ func (n *Node) BroadcastPayLoad(data interface{}, hash []byte) error {
 			if _, err := n.rpcClientsMap[id].Call(data); err != nil {
 				panic(err)
 			}
-			n.logger.Debug("Sending a payload", "ms", time.Now().Sub(start).Milliseconds(), "hash", string(hash))
+			n.logger.Info("Sending a payload", "ms", time.Now().Sub(start).Milliseconds(),
+				"hash", string(hash), "id", id)
 		}(i)
 	}
 	return nil
