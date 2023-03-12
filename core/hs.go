@@ -58,12 +58,12 @@ func (h *HS) BroadcastProposalProof(height int) error {
 		return errors.New("height of proof is incorrect")
 	}
 
-	h.hLogger.Info("before acquiring a lock before creating block, 1111")
+	h.hLogger.Info("before acquiring a lock before creating block, 1111", "pr.Height", pr.Height)
 	h.node.Lock()
-	h.hLogger.Info("got a lock before creating block, 2222")
+	h.hLogger.Info("got a lock before creating block, 2222", "pr.Height", pr.Height)
 	payLoadHashes, cnt := h.node.createBlock(true)
 	h.node.Unlock()
-	h.hLogger.Info("after releasing a lock before creating block, 3333")
+	h.hLogger.Info("after releasing a lock before creating block, 3333", "pr.Height", pr.Height)
 
 	blk := &Block{
 		TxNum:         cnt * h.node.maxNumInPayLoad,

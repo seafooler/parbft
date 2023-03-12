@@ -372,14 +372,16 @@ func (n *Node) InitializePessimisticPath(height int) {
 
 func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t *time.Timer) {
 	n.logger.Debug("Update the node status", "replica", n.Name, "data", data)
-	n.logger.Info("before acquiring a lock in updateStatusByOptimisticData, 1111")
+	n.logger.Info("before acquiring a lock in updateStatusByOptimisticData, 1111", "data.Height", data.Height)
 	n.Lock()
 	defer n.Unlock()
-	n.logger.Info("acquired a lock in updateStatusByOptimisticData, 2222")
+	n.logger.Info("acquired a lock in updateStatusByOptimisticData, 2222", "data.Height", data.Height)
 	prevHeight := data.Height - 1
 
 	if prevHeight <= n.committedHeight {
 		// previous block of optimistic return height has been committed before, maybe by the final agreement
+		n.logger.Info("after releasing a lock in updateStatusByOptimisticData, 3333....1111", "data.Height", data.Height)
+
 		return
 	} else {
 		// previous height has not been committed
@@ -407,6 +409,7 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 
 	if prevHeight == n.committedHeight+1 {
 		// pre-previous height has been committed
+		n.logger.Info("after releasing a lock in updateStatusByOptimisticData, 3333....22222", "data.Height", data.Height)
 		return
 	}
 
@@ -417,7 +420,7 @@ func (n *Node) updateStatusByOptimisticData(data *ReadyData, ch chan struct{}, t
 	if _, ok := n.proofedHeight[data.Height+2]; ok {
 		n.tryCommit(data.Height + 2)
 	}
-	n.logger.Info("after releasing a lock in updateStatusByOptimisticData, 3333")
+	n.logger.Info("after releasing a lock in updateStatusByOptimisticData, 3333", "data.Height", data.Height)
 }
 
 // tryCommit must be wrapped in a lock
