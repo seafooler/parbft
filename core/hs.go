@@ -5,6 +5,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/seafooler/sign_tools"
 	"sync"
+	"time"
 )
 
 type HS struct {
@@ -73,6 +74,11 @@ func (h *HS) BroadcastProposalProof(height int) error {
 		Block: *blk,
 		Proof: pr.Proof,
 	}
+
+	if h.node.DDoS {
+		time.Sleep(time.Millisecond * time.Duration(h.node.Config.DDoSDelay))
+	}
+
 	if err := h.node.PlainBroadcast(HSProposalMsgTag, proposalMsg, nil); err != nil {
 		return err
 	}
