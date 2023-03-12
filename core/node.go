@@ -630,7 +630,7 @@ func (n *Node) WaitForEnoughSyncLaunchMsgs() error {
 			switch msg.(type) {
 			case PaceSyncMsg:
 				count += 1
-				if count >= n.N-3 {
+				if count >= n.N {
 					return nil
 				}
 			default:
