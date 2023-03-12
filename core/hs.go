@@ -205,7 +205,7 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 
 // ProcessHSVoteMsg stores the vote messages and attempts to create the ts proof
 func (h *HS) ProcessHSVoteMsg(vm *HSVoteMsg) error {
-	h.hLogger.Debug("Process the Hs Vote Message", "block_index", vm.Height, "voter", vm.Voter)
+	h.hLogger.Info("Process the Hs Vote Message", "block_index", vm.Height, "voter", vm.Voter)
 	h.Lock()
 	defer h.Unlock()
 	if _, ok := h.cachedVoteMsgs[vm.Height]; !ok {
