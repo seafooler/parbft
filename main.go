@@ -27,6 +27,9 @@ func main() {
 	if err = node.StartP2PListen(); err != nil {
 		panic(err)
 	}
+	if err = node.StartP2PSyncListen(); err != nil {
+		panic(err)
+	}
 
 	go node.StartListenRPC()
 
@@ -34,6 +37,10 @@ func main() {
 	time.Sleep(time.Second * time.Duration(conf.WaitTime))
 
 	if err = node.EstablishP2PConns(); err != nil {
+		panic(err)
+	}
+
+	if err = node.EstablishP2PSyncConns(); err != nil {
 		panic(err)
 	}
 

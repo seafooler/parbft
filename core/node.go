@@ -23,7 +23,8 @@ type Node struct {
 
 	reflectedTypesMap map[uint8]reflect.Type
 
-	trans *conn.NetworkTransport
+	trans     *conn.NetworkTransport
+	transSync *conn.NetworkTransport
 
 	rpcClientsMap     map[int]*gorpc.Client
 	payLoads          map[[HASHSIZE]byte]bool
@@ -85,6 +86,17 @@ func NewNode(conf *config.Config) *Node {
 func (n *Node) StartP2PListen() error {
 	var err error
 	n.trans, err = conn.NewTCPTransport(":"+n.P2pPort, 2*time.Second,
+		nil, n.MaxPool, n.reflectedTypesMap)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// StartP2PSyncListen starts the node to listen for sync.
+func (n *Node) StartP2PSyncListen() error {
+	var err error
+	n.transSync, err = conn.NewTCPTransport(":6000", 2*time.Second,
 		nil, n.MaxPool, n.reflectedTypesMap)
 	if err != nil {
 		return err
@@ -554,6 +566,23 @@ func (n *Node) EstablishP2PConns() error {
 	return nil
 }
 
+// EstablishP2PSyncConns establishes P2P connections with other nodes.
+func (n *Node) EstablishP2PSyncConns() error {
+	if n.transSync == nil {
+		return errors.New("networktransport has not been created")
+	}
+	for _, addr := range n.Id2AddrMap {
+		addrWithPort := addr + ":6000"
+		conn, err := n.transSync.GetConn(addrWithPort)
+		if err != nil {
+			return err
+		}
+		n.transSync.ReturnConn(conn)
+		n.logger.Debug("connection has been established", "sender", n.Name, "receiver", addr)
+	}
+	return nil
+}
+
 func (n *Node) EstablishRPCConns() {
 	for name, addr := range n.Id2AddrMap {
 		addrWithPort := addr + ":" + n.Id2PortPayLoadMap[name]
@@ -609,16 +638,15 @@ func (n *Node) PlainBroadcast(tag byte, data interface{}, sig []byte) error {
 func (n *Node) BroadcastSyncLaunchMsgs() error {
 	for i, a := range n.Id2AddrMap {
 		go func(id int, addr string) {
-			port := n.Id2PortMap[id]
-			addrPort := addr + ":" + port
-			c, err := n.trans.GetConn(addrPort)
+			addrPort := addr + ":6000"
+			c, err := n.transSync.GetConn(addrPort)
 			if err != nil {
 				panic(err)
 			}
 			if err := conn.SendMsg(c, PaceSyncMsgTag, PaceSyncMsg{SN: -1, Sender: n.Id, Epoch: -1}, nil); err != nil {
 				panic(err)
 			}
-			if err = n.trans.ReturnConn(c); err != nil {
+			if err = n.transSync.ReturnConn(c); err != nil {
 				panic(err)
 			}
 		}(i, a)
@@ -627,7 +655,7 @@ func (n *Node) BroadcastSyncLaunchMsgs() error {
 }
 
 func (n *Node) WaitForEnoughSyncLaunchMsgs() error {
-	msgCh := n.trans.MsgChan()
+	msgCh := n.transSync.MsgChan()
 	count := 0
 	for {
 		select {
