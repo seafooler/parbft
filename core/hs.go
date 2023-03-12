@@ -97,10 +97,14 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 	// try to cache a previous block
 	h.tryCache(pm.Height, pm.Proof, pm.PayLoadHashes)
 
+	h.hLogger.Info("$$$$$$$$$$ 11111111111111")
+
 	// if there is already a subsequent block, deal with it
 	if plHashes, ok := h.cachedHeight[pm.Height+1]; ok {
 		h.tryCache(pm.Height+1, h.cachedBlockProposals[pm.Height+1].Proof, plHashes)
 	}
+
+	h.hLogger.Info("$$$$$$$$$$ 22222222222222")
 
 	go func() {
 		h.node.ReadyData <- ReadyData{
@@ -115,7 +119,10 @@ func (h *HS) ProcessHSProposalMsg(pm *HSProposalMsg) error {
 		return err
 	}
 
+	h.hLogger.Info("$$$$$$$$$$ 33333333333333")
+
 	if h.node.Id == pm.Height%h.node.N {
+		h.hLogger.Info("$$$$$$$$$$ 4444444444444")
 		err := h.tryAssembleProof(pm.Height)
 		h.hLogger.Info("after releasing the HS lock in ProcessHSProposalMsg, 33333", "height", pm.Height)
 		return err
@@ -136,12 +143,16 @@ func (h *HS) tryCache(height int, proof map[int][]byte, plHashes [][HASHSIZE]byt
 		return nil
 	}
 
+	h.hLogger.Info("tryCache $$$$$$$$$$ 11111", "height", height)
+
 	// verify the proof
 	blockBytes, err := encode(pBlk.Block)
 	if err != nil {
 		h.hLogger.Error("fail to encode the block", "block_index", height)
 		return err
 	}
+
+	h.hLogger.Info("tryCache $$$$$$$$$$ 22222", "height", height)
 
 	if len(proof) < h.node.N-h.node.F {
 		h.hLogger.Error("the number of signatures in the proof is not enough", "needed", h.node.N-h.node.F,
@@ -155,6 +166,8 @@ func (h *HS) tryCache(height int, proof map[int][]byte, plHashes [][HASHSIZE]byt
 			return err
 		}
 	}
+
+	h.hLogger.Info("tryCache $$$$$$$$$$ 3333333", "height", height)
 
 	//if _, err := sign_tools.VerifyTS(h.node.PubKeyTS, blockBytes, proof); err != nil {
 	//	h.hLogger.Error("fail to verify proof of a previous block", "prev_block_index", pBlk.Height)
@@ -176,6 +189,8 @@ func (h *HS) tryCache(height int, proof map[int][]byte, plHashes [][HASHSIZE]byt
 	if hashes, ok := h.cachedHeight[height+1]; ok {
 		h.tryCache(height+1, h.cachedBlockProposals[height+1].Proof, hashes)
 	}
+
+	h.hLogger.Info("tryCache $$$$$$$$$$ 44444444", "height", height)
 
 	return nil
 }
