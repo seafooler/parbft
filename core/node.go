@@ -347,7 +347,7 @@ func (n *Node) HandleMsgsLoop() {
 			//}
 
 			// timer is set as 5\Delta, namely 2.5 timeout
-			timer := time.NewTimer(time.Duration(n.Config.Timeout/2) * time.Millisecond)
+			timer := time.NewTimer(time.Duration(n.Config.Timeout*2) * time.Millisecond)
 
 			// launch the pessimistic path
 			go func(t *time.Timer, ch chan struct{}, height int) {
@@ -356,7 +356,7 @@ func (n *Node) HandleMsgsLoop() {
 					n.logger.Debug("!!! Receive a channel signal", "height", height)
 					return
 				case <-t.C:
-					n.logger.Debug("pessimistic path is launched", "height", height)
+					n.logger.Info("pessimistic path is launched", "height", height)
 					//n.LaunchPessimisticPath(blk)
 					n.Lock()
 					payLoadHashes, cnt := n.createBlock(false)
