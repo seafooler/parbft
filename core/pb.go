@@ -33,7 +33,7 @@ func NewPB(s *SPB, id uint8) *PB {
 	}
 }
 
-func (pb *PB) PBBroadcastData(data [][HASHSIZE]byte, proof []byte, txCount, view int, phase uint8) error {
+func (pb *PB) PBBroadcastData(data [][HASHSIZE]byte, proof []byte, view int, phase uint8) error {
 	qcdChan := make(chan SMVBAQCedData)
 
 	pb.mux.Lock()
@@ -47,11 +47,10 @@ func (pb *PB) PBBroadcastData(data [][HASHSIZE]byte, proof []byte, txCount, view
 	pb.dataToPB = data          // Each time a data is broadcast via pb, update the dataToPB
 
 	valMsg := SMVBAPBVALMessage{
-		Height:  pb.spb.s.height,
-		TxCount: txCount,
-		Data:    data,
-		Proof:   proof,
-		Dealer:  pb.spb.s.node.Name,
+		Height: pb.spb.s.height,
+		Data:   data,
+		Proof:  proof,
+		Dealer: pb.spb.s.node.Name,
 		SMVBAViewPhase: SMVBAViewPhase{
 			View:  view,
 			Phase: phase,
@@ -83,7 +82,7 @@ func (pb *PB) handlePBVALMsg(valMsg *SMVBAPBVALMessage) error {
 	partialSig := sign_tools.SignTSPartial(pb.spb.s.node.PriKeyTS, hash)
 	votMsg := SMVBAPBVOTMessage{
 		Height:         valMsg.Height,
-		TxCount:        valMsg.TxCount,
+		Data:           valMsg.Data,
 		PartialSig:     partialSig,
 		Dealer:         valMsg.Dealer,
 		Sender:         pb.spb.s.node.Name,
@@ -117,7 +116,7 @@ func (pb *PB) handlePBVOTMsg(votMsg *SMVBAPBVOTMessage) error {
 
 		qcedData := SMVBAQCedData{
 			Height:         votMsg.Height,
-			TxCount:        votMsg.TxCount,
+			Data:           votMsg.Data,
 			Hash:           pb.dataHash,
 			QC:             intactSig,
 			SMVBAViewPhase: votMsg.SMVBAViewPhase,

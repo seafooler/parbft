@@ -117,7 +117,7 @@ type SMVBAPBVALMessage struct {
 
 type SMVBAPBVOTMessage struct {
 	Height     int
-	TxCount    int
+	Data       [][HASHSIZE]byte
 	Hash       []byte
 	PartialSig []byte
 	Dealer     string
@@ -126,34 +126,34 @@ type SMVBAPBVOTMessage struct {
 }
 
 type SMVBAQCedData struct {
-	Height  int
-	TxCount int
-	Hash    []byte
-	QC      []byte
+	Height int
+	Data   [][HASHSIZE]byte
+	Hash   []byte
+	QC     []byte
 	SMVBAViewPhase
 }
 
 type SMVBAFinishMessage struct {
-	Height  int
-	Hash    []byte
-	QC      []byte
-	Dealer  string
-	TxCount int
-	View    int
+	Height int
+	Hash   []byte
+	QC     []byte
+	Dealer string
+	Data   [][HASHSIZE]byte
+	View   int
 }
 
 type SMVBADoneShareMessage struct {
 	Height  int
 	TSShare []byte
 	Sender  string
-	TxCount int
+	Data    [][HASHSIZE]byte
 	View    int
 }
 
 // SMVBAPreVoteMessage must contain SNView
 type SMVBAPreVoteMessage struct {
 	Height            int
-	TxCount           int
+	Data              [][HASHSIZE]byte
 	Flag              bool
 	Dealer            string
 	Hash              []byte
@@ -165,13 +165,13 @@ type SMVBAPreVoteMessage struct {
 
 // SMVBAVoteMessage must contain SNView
 type SMVBAVoteMessage struct {
-	Height  int
-	TxCount int
-	Flag    bool
-	Dealer  string
-	Hash    []byte
-	Proof   []byte // sigma_1 or sigma_{PN}
-	Pho     []byte // pho_{2,i} or pho_{vn, i}
+	Height int
+	Data   [][HASHSIZE]byte
+	Flag   bool
+	Dealer string
+	Hash   []byte
+	Proof  []byte // sigma_1 or sigma_{PN}
+	Pho    []byte // pho_{2,i} or pho_{vn, i}
 
 	Sender string
 
@@ -179,12 +179,12 @@ type SMVBAVoteMessage struct {
 }
 
 type SMVBAHaltMessage struct {
-	Height  int
-	TxCount int
-	Hash    []byte
-	Proof   []byte
-	Dealer  string
-	View    int
+	Height int
+	Data   [][HASHSIZE]byte
+	Hash   []byte
+	Proof  []byte
+	Dealer string
+	View   int
 }
 
 type SMVBAReadyViewData struct {
