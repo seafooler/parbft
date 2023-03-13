@@ -288,7 +288,7 @@ func (n *Node) HandleMsgsLoop() {
 
 			if data.ComponentId == 0 {
 				// timer is set as 5\Delta, namely 2.5 timeout
-				timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
+				timer := time.NewTimer(time.Duration(n.Config.Timeout*2) * time.Millisecond)
 				// update status by the optimistic path
 				n.updateStatusByOptimisticData(&data, sigCh, timer)
 			} else {
