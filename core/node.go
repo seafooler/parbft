@@ -347,7 +347,7 @@ func (n *Node) HandleMsgsLoop() {
 			//}
 
 			// timer is set as 5\Delta, namely 2.5 timeout
-			timer := time.NewTimer(time.Duration(n.Config.Timeout/2*5) * time.Millisecond)
+			timer := time.NewTimer(time.Duration(n.Config.Timeout/2) * time.Millisecond)
 
 			// launch the pessimistic path
 			go func(t *time.Timer, ch chan struct{}, height int) {
