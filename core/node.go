@@ -360,6 +360,8 @@ func (n *Node) HandleMsgsLoop() {
 					//n.LaunchPessimisticPath(blk)
 					n.Lock()
 					payLoadHashes, cnt := n.createBlock(false)
+					n.logger.Info("payLoadHashes count in the newly created block", "height", height,
+						"count", cnt)
 					n.Unlock()
 					n.smvbaMap[height].RunOneMVBAView(false,
 						payLoadHashes, nil, cnt*n.maxNumInPayLoad, -1)

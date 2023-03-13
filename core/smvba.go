@@ -368,14 +368,14 @@ func (s *SMVBA) HaltOrPreVote(h, v int, data [][HASHSIZE]byte, coinNode string) 
 
 		go s.node.PlainBroadcast(SMVBAHaltTag, hm, nil)
 
-		payLoadHashes, ok := s.payLoadHashesMap[coinNode]
-		if !ok {
-			s.logger.Error("payLoadHashes has not received by the node")
-		}
+		//payLoadHashes, ok := s.payLoadHashesMap[coinNode]
+		//if !ok {
+		//	s.logger.Error("payLoadHashes has not received by the node")
+		//}
 
 		s.logger.Info("Return from SMVBA", "replica", s.node.Name, "Height", h, "View", v,
-			"dealer", finishMsgByCoin.Dealer, "data", string(s.output))
-		go s.node.abaMap[hm.Height].inputValue(hm.Height, payLoadHashes, 1)
+			"dealer", finishMsgByCoin.Dealer, "data", data)
+		go s.node.abaMap[hm.Height].inputValue(hm.Height, data, 1)
 
 		// send a signal to suspend this round of MVBA or receiving a signal that MVBA has been suspended
 		s.logger.Debug("Before sending a signal to outputCh or receiving a signal from stopCh in HaltOrPreVote",
@@ -583,7 +583,7 @@ func (s *SMVBA) HandleVoteMsg(vm *SMVBAVoteMessage) {
 				s.logger.Error("payLoadHashes has not received by the node")
 			}
 
-			s.logger.Info("Return from SMVBA", "replica", s.node.Name, "s.Height", s.height,
+			s.logger.Info("Return from SMVBA", "replica", s.node.Name, "Height", s.height,
 				"msg.View", vm.View, "dealer", vm.Dealer, "data", string(s.output))
 			go s.node.abaMap[hm.Height].inputValue(hm.Height, payLoadHashes, 1)
 
@@ -638,17 +638,17 @@ func (s *SMVBA) HandleHaltMsg(hm *SMVBAHaltMessage) {
 	if s.output == nil {
 		s.output = hm.Hash
 		s.logger.Debug("Data is output after consensus by receiving a halt message ", "replica", s.node.Name,
-			"Height", hm.Height, "node-view", s.view, "dealer", hm.Dealer, "data", string(s.output))
+			"Height", hm.Height, "node-view", s.view, "dealer", hm.Dealer, "data", hm.Data)
 		go s.node.PlainBroadcast(SMVBAHaltTag, *hm, nil)
 
-		payLoadHashes, ok := s.payLoadHashesMap[hm.Dealer]
-		if !ok {
-			s.logger.Error("payLoadHashes has not received by the node")
-		}
+		//payLoadHashes, ok := s.payLoadHashesMap[hm.Dealer]
+		//if !ok {
+		//	s.logger.Error("payLoadHashes has not received by the node")
+		//}
 
-		s.logger.Info("Return from SMVBA", "replica", s.node.Name, "s.Height", s.height, "View", s.view,
-			"dealer", hm.Dealer, "data", string(s.output))
-		go s.node.abaMap[hm.Height].inputValue(hm.Height, payLoadHashes, 1)
+		s.logger.Info("Return from SMVBA", "replica", s.node.Name, "Height", s.height, "View", s.view,
+			"dealer", hm.Dealer, "data", hm.Data)
+		go s.node.abaMap[hm.Height].inputValue(hm.Height, hm.Data, 1)
 
 		// send a signal to suspend this round of MVBA
 		s.logger.Debug("Before sending a signal to outputCh or receiving a signal from stopCh in HandleHaltMsg",
