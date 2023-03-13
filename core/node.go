@@ -292,17 +292,45 @@ func (n *Node) HandleMsgsLoop() {
 				// update status by the optimistic path
 				n.updateStatusByOptimisticData(&data, sigCh, timer)
 			} else {
+				if data.Height > n.committedHeight {
+					// update status by the pessimistic path
+					n.Lock()
+					n.committedHeight = data.Height
+					committedCount := 0
+					// switch to the next leader
+					//n.Hs.LeaderId = (n.Hs.LeaderId + 1) % n.Config.N
+					for _, plHash := range data.PayLoadHashes {
+						if _, ok := n.payLoads[plHash]; ok {
+							delete(n.payLoads, plHash)
+							committedCount++
+						} else {
+							if _, existed := n.committedPayloads[plHash]; !existed {
+								n.committedPayloads[plHash] = true
+								committedCount++
+							}
+						}
+					}
+					n.Unlock()
+
+					n.logger.Info("commit the block from the final ABA", "replica", n.Name, "block_index",
+						data.Height, "committed_payload_cnt", committedCount)
+					n.Hs = NewHS(n, data.Height)
+
+					if n.Id == data.Height {
+						go func() {
+							n.Hs.ProofReady <- &ProofData{
+								Proof:  nil,
+								Height: data.Height,
+							}
+						}()
+					}
+
+				}
+
 				// For debug
-				//if data.Height > n.committedHeight {
-				//	// update status by the pessimistic path
-				//	n.committedHeight = data.Height
-				//	// switch to the next leader
-				//	n.Hs.LeaderId = (n.Hs.LeaderId + 1) % n.Config.N
-				//	n.logger.Info("commit the block from the final ABA", "replica", n.Name, "block_index", data.Height)
-				//}
-				n.logger.Info("receive a result from final ABA but do not commit", "replica", n.Name,
-					"block_index", data.Height)
-				continue
+				//n.logger.Info("receive a result from final ABA but do not commit", "replica", n.Name,
+				//	"block_index", data.Height)
+				//continue
 			}
 
 			// continue the optimistic path

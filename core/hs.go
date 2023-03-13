@@ -200,25 +200,21 @@ func (h *HS) sendVote(pm *HSProposalMsg) error {
 		h.hLogger.Error("fail to vote for the block", "block_index", pm.Height)
 		return err
 	} else {
-		h.hLogger.Info("successfully vote for the block", "block_index", pm.Height, "addrPort", leaderAddrPort)
+		h.hLogger.Debug("successfully vote for the block", "block_index", pm.Height, "addrPort", leaderAddrPort)
 	}
 	return nil
 }
 
 // ProcessHSVoteMsg stores the vote messages and attempts to create the ts proof
 func (h *HS) ProcessHSVoteMsg(vm *HSVoteMsg) error {
-	h.hLogger.Info("Process the Hs Vote Message", "height", vm.Height, "voter", vm.Voter)
-	h.hLogger.Info("before acquiring the HS lock in ProcessHSVoteMsg", "height", vm.Height, "voter", vm.Voter)
+	h.hLogger.Debug("Process the Hs Vote Message", "height", vm.Height, "voter", vm.Voter)
 	h.Lock()
-	h.hLogger.Info("acquired the HS lock in ProcessHSVoteMsg", "height", vm.Height)
 	defer h.Unlock()
 	if _, ok := h.cachedVoteMsgs[vm.Height]; !ok {
 		h.cachedVoteMsgs[vm.Height] = make(map[int][]byte)
 	}
 	h.cachedVoteMsgs[vm.Height][vm.Voter] = vm.EDSig
 	err := h.tryAssembleProof(vm.Height)
-	h.hLogger.Info("after releasing the HS lock in ProcessHSVoteMsg", "height", vm.Height, "len(votes)",
-		len(h.cachedVoteMsgs[vm.Height]))
 	return err
 }
 
