@@ -75,6 +75,8 @@ func (h *HS) BroadcastProposalProof(height int) error {
 		Proof: pr.Proof,
 	}
 
+	h.hLogger.Info("successfully broadcast a new proposal and proof", "txNum", proposalMsg.TxNum,
+		"height", blk.Height)
 	if h.node.DDoS {
 		time.Sleep(time.Millisecond * time.Duration(h.node.Config.DDoSDelay))
 	}
@@ -82,8 +84,6 @@ func (h *HS) BroadcastProposalProof(height int) error {
 	if err := h.node.PlainBroadcast(HSProposalMsgTag, proposalMsg, nil); err != nil {
 		return err
 	}
-	h.hLogger.Info("successfully broadcast a new proposal and proof", "txNum", proposalMsg.TxNum,
-		"height", blk.Height)
 	return nil
 }
 
